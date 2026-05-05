@@ -1,0 +1,43 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36" version="29.3.6">
+  <diagram name="Page-1" id="k-q-dOaPLWQWfbb0lIBL">
+    <mxGraphModel dx="772" dy="416" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="bKnQOfpaeqJSpSs0Qtys-2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;rotation=90;shadow=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="" vertex="1">
+          <mxGeometry height="170" width="280" x="20" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="bKnQOfpaeqJSpSs0Qtys-5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;rotation=90;shadow=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="" vertex="1">
+          <mxGeometry height="170" width="280" x="285" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="bKnQOfpaeqJSpSs0Qtys-6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;rotation=90;shadow=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="" vertex="1">
+          <mxGeometry height="170" width="280" x="550" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="bKnQOfpaeqJSpSs0Qtys-7" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;b&gt;Input&lt;/b&gt;" vertex="1">
+          <mxGeometry height="30" width="60" x="130" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="bKnQOfpaeqJSpSs0Qtys-9" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;b&gt;Process&lt;/b&gt;" vertex="1">
+          <mxGeometry height="30" width="60" x="395" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="bKnQOfpaeqJSpSs0Qtys-10" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;b&gt;Output&lt;/b&gt;" vertex="1">
+          <mxGeometry height="30" width="60" x="650" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="bKnQOfpaeqJSpSs0Qtys-11" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;" value="&lt;div style=&quot;&quot;&gt;&lt;ul&gt;&lt;li&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;User Requirements&lt;/span&gt;&lt;/li&gt;&lt;li&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Student data ( ID, name, RFID number)&lt;/span&gt;&lt;/li&gt;&lt;li&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Employee data ( ID, name, biometric data)&lt;/span&gt;&lt;/li&gt;&lt;li&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Visitor Information&amp;nbsp;&lt;/span&gt;&lt;/li&gt;&lt;li&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;( name, purpose, photo)&lt;/span&gt;&lt;/li&gt;&lt;li&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Hardware ( RFID reader, Biometric scanner, webcam)&lt;/span&gt;&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="160" x="70" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="bKnQOfpaeqJSpSs0Qtys-12" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;" value="&lt;ul&gt;&lt;li&gt;Analysis and Design&lt;/li&gt;&lt;li&gt;Data gathering&lt;/li&gt;&lt;li&gt;Software development and coding&lt;/li&gt;&lt;li&gt;Testing, debugging, and system evaluation&lt;/li&gt;&lt;/ul&gt;" vertex="1">
+          <mxGeometry height="30" width="160" x="336" y="230" as="geometry" />
+        </mxCell>
+        <mxCell id="bKnQOfpaeqJSpSs0Qtys-13" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;" value="&lt;ul&gt;&lt;li&gt;Functional web-based attendance and visitor management system&lt;/li&gt;&lt;li&gt;Automated student attendance via RFID&amp;nbsp;&lt;/li&gt;&lt;li&gt;Attendance employee attendance via biometrics&lt;/li&gt;&lt;li&gt;Visitor registration with photo&lt;/li&gt;&lt;li&gt;Real-time monitoring&lt;/li&gt;&lt;li&gt;Efficient reporting&lt;/li&gt;&lt;/ul&gt;" vertex="1">
+          <mxGeometry height="30" width="170" x="595" y="258" as="geometry" />
+        </mxCell>
+        <mxCell id="bKnQOfpaeqJSpSs0Qtys-15" parent="1" style="shape=singleArrow;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="60" width="80" x="256" y="235" as="geometry" />
+        </mxCell>
+        <mxCell id="bKnQOfpaeqJSpSs0Qtys-16" parent="1" style="shape=singleArrow;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="60" width="80" x="520" y="230" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
