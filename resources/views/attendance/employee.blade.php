@@ -22,10 +22,10 @@
             </div>
             <div class="card-body">
                 <form method="GET" action="{{ route('attendance.employee') }}" id="filterForm">
-                    <div class="row">
-                        <div class="col-md-2">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-lg-2 col-md-3 col-sm-6 col-12">
                             <label class="form-label">Department</label>
-                            <select name="department" class="form-control">
+                            <select name="department" class="form-control w-100">
                                 <option value="all">All Departments</option>
                                 @foreach($departments as $department)
                                     <option value="{{ $department }}" {{ ($filters['department'] ?? '') === $department ? 'selected' : '' }}>
@@ -34,34 +34,31 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div class="col-md-2">
-                            <label class="form-label">Employee Name / Employee No.</label>
-                            <input type="text" name="employee" class="form-control"
+                        <div class="col-lg-2 col-md-3 col-sm-6 col-12">
+                            <label class="form-label text-nowrap">Employee Name / Employee No.</label>
+                            <input type="text" name="employee" class="form-control w-100"
                                    value="{{ $filters['employee'] ?? '' }}" placeholder="Type name or employee no.">
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-lg-2 col-md-3 col-sm-6 col-12">
                             <label class="form-label">Date From</label>
-                            <input type="date" name="date_from" class="form-control" value="{{ $filters['date_from'] ?? '' }}">
+                            <input type="date" name="date_from" class="form-control w-100" value="{{ $filters['date_from'] ?? '' }}">
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-lg-2 col-md-3 col-sm-6 col-12">
                             <label class="form-label">Date To</label>
-                            <input type="date" name="date_to" class="form-control" value="{{ $filters['date_to'] ?? '' }}">
+                            <input type="date" name="date_to" class="form-control w-100" value="{{ $filters['date_to'] ?? '' }}">
                         </div>
-                        <div class="col-md-1">
-                            <label class="form-label">&nbsp;</label>
-                            <button type="submit" name="action" value="search" class="btn btn-primary" style="width: 100%;">
+                        <div class="col-lg-1 col-md-2 col-sm-4 col-6">
+                            <button type="submit" name="action" value="search" class="btn btn-primary w-100 text-nowrap">
                                 <i class="fas fa-search"></i> Search
                             </button>
                         </div>
-                        <div class="col-md-2">
-                            <label class="form-label">&nbsp;</label>
-                            <button type="submit" name="action" value="all" class="btn btn-info" style="width: 100%; color: white;">
+                        <div class="col-lg-2 col-md-3 col-sm-8 col-6">
+                            <button type="submit" name="action" value="all" class="btn btn-info w-100 text-nowrap" style="color: white;">
                                 <i class="fas fa-users"></i> All Employees
                             </button>
                         </div>
-                        <div class="col-md-1">
-                            <label class="form-label">&nbsp;</label>
-                            <a href="{{ route('attendance.employee') }}" class="btn btn-secondary" style="width: 100%; color: white;">
+                        <div class="col-lg-1 col-md-2 col-sm-12 col-12">
+                            <a href="{{ route('attendance.employee') }}" class="btn btn-secondary w-100 text-nowrap" style="color: white;">
                                 <i class="fas fa-redo"></i> Reset
                             </a>
                         </div>

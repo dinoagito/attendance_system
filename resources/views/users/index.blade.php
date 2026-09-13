@@ -155,7 +155,7 @@
                                                     @csrf
                                                     @method('DELETE')
                                                     <input type="hidden" name="user_type" value="employee">
-                                                    <button type="submit" class="action-btn delete" title="Delete" onclick="return confirm('Delete this employee? This is allowed only when status is Inactive.')">
+                                                    <button type="submit" class="action-btn delete" title="Delete">
                                                         <i class="fas fa-trash"></i>
                                                     </button>
                                                 </form>
@@ -265,9 +265,7 @@
                     @csrf
                     @method('DELETE')
                     <input type="hidden" name="user_type" value="visitor">
-                    <button type="submit" class="action-btn delete"
-                        title="Delete"
-                        onclick="return confirm('Are you sure?')">
+                    <button type="submit" class="action-btn delete" title="Delete">
                         <i class="fas fa-trash"></i>
                     </button>
                 </form>
@@ -578,56 +576,146 @@
     </div>
 </div>
 
+<!-- Delete Confirmation Modal — replaces native confirm() -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom:1px solid #e0e0e0;">
+                <h5 class="modal-title" id="deleteConfirmTitle" style="color:#dc3545;"><i class="fas fa-exclamation-triangle" style="color:#dc3545;"></i> Delete Employee?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="mb-3" style="font-size:52px;color:#dc3545;"><i class="fas fa-trash"></i></div>
+                <p class="fs-5 mb-2" style="font-weight:600;color:#212529;" id="deleteConfirmHeading">This employee will be permanently deleted.</p>
+                <p class="text-muted mb-1" id="deleteConfirmName" style="font-weight:500;"></p>
+                <p class="text-muted small mb-0" id="deleteConfirmMessage">This action may also remove related attendance, schedule, fingerprint and credential records. This cannot be undone. Only Inactive employees can be deleted.</p>
+            </div>
+            <div class="modal-footer justify-content-center gap-2">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn" style="font-weight:600;"><i class="fas fa-trash"></i> Delete Employee</button>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+@section('scripts')
 <script>
-document.querySelectorAll('.edit-employee').forEach(btn => {
-    btn.addEventListener('click', async function() {
-        const employeeId = this.dataset.id;
-        const response = await fetch(`/api/employees/${employeeId}`);
-        const employee = await response.json();
-        
-        document.getElementById('edit_emp_first_name').value = employee.first_name;
-        document.getElementById('edit_emp_last_name').value = employee.last_name;
-        document.getElementById('edit_emp_department').value = employee.department || '';
-        document.getElementById('edit_emp_email').value = employee.email || '';
-        document.getElementById('edit_emp_phone').value = employee.phone || '';
-        document.getElementById('edit_emp_status').value = employee.status || 'active';
-        
-        const form = document.getElementById('editEmployeeForm');
-        form.action = `/users/${employeeId}`;
-    });
-});
-
-document.querySelectorAll('.edit-visitor').forEach(btn => {
-    btn.addEventListener('click', async function() {
-        const visitorId = this.dataset.id;
-        const response = await fetch(`/api/visitors/${visitorId}`);
-        const visitor = await response.json();
-        
-        document.getElementById('edit_visitor_name').value = visitor.full_name;
-        document.getElementById('edit_visitor_phone').value = visitor.phone || '';
-        document.getElementById('edit_visitor_person').value = visitor.person_to_visit || '';
-        document.getElementById('edit_visitor_purpose').value = visitor.purpose;
-        document.getElementById('edit_visitor_date').value = visitor.date;
-        document.getElementById('edit_visitor_time_in').value = visitor.time_in.substring(0, 5);
-        document.getElementById('edit_visitor_time_out').value = visitor.time_out ? visitor.time_out.substring(0, 5) : '';
-        
-        const form = document.getElementById('editVisitorForm');
-        form.action = `/users/${visitorId}`;
-    });
-});
-
 document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.edit-employee').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const employeeId = this.dataset.id;
+            const response = await fetch(`/api/employees/${employeeId}`);
+            const employee = await response.json();
+
+            document.getElementById('edit_emp_first_name').value = employee.first_name;
+            document.getElementById('edit_emp_last_name').value = employee.last_name;
+            document.getElementById('edit_emp_department').value = employee.department || '';
+            document.getElementById('edit_emp_email').value = employee.email || '';
+            document.getElementById('edit_emp_phone').value = employee.phone || '';
+            document.getElementById('edit_emp_status').value = employee.status || 'active';
+
+            const form = document.getElementById('editEmployeeForm');
+            form.action = `/users/${employeeId}`;
+        });
+    });
+
+    document.querySelectorAll('.edit-visitor').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const visitorId = this.dataset.id;
+            const response = await fetch(`/api/visitors/${visitorId}`);
+            const visitor = await response.json();
+
+            document.getElementById('edit_visitor_name').value = visitor.full_name;
+            document.getElementById('edit_visitor_phone').value = visitor.phone || '';
+            document.getElementById('edit_visitor_person').value = visitor.person_to_visit || '';
+            document.getElementById('edit_visitor_purpose').value = visitor.purpose;
+            document.getElementById('edit_visitor_date').value = visitor.date;
+            document.getElementById('edit_visitor_time_in').value = visitor.time_in.substring(0, 5);
+            document.getElementById('edit_visitor_time_out').value = visitor.time_out ? visitor.time_out.substring(0, 5) : '';
+
+            const form = document.getElementById('editVisitorForm');
+            form.action = `/users/${visitorId}`;
+        });
+    });
+
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab');
 
-    if (!tab) {
-        return;
+    if (tab) {
+        const tabButton = document.getElementById(`${tab}-tab`);
+        if (tabButton) {
+            const bsTab = new bootstrap.Tab(tabButton);
+            bsTab.show();
+        }
     }
 
-    const tabButton = document.getElementById(`${tab}-tab`);
-    if (tabButton) {
-        const bsTab = new bootstrap.Tab(tabButton);
-        bsTab.show();
+    // Delete confirmation modal — replaces native confirm() with Bootstrap modal
+    // Wrapped in DOMContentLoaded so bootstrap.Modal is defined (app.blade.php loads bootstrap.bundle before scripts)
+    let pendingDeleteForm = null;
+    const deleteModalEl = document.getElementById('deleteConfirmModal');
+    const deleteModal = deleteModalEl ? new bootstrap.Modal(deleteModalEl) : null;
+    const deleteTitle = document.getElementById('deleteConfirmTitle');
+    const deleteHeading = document.getElementById('deleteConfirmHeading');
+    const deleteNameEl = document.getElementById('deleteConfirmName');
+    const deleteMsgEl = document.getElementById('deleteConfirmMessage');
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+
+    document.querySelectorAll('form[action*="/users/"] button.delete').forEach(btn => {
+        const form = btn.closest('form');
+        if (!form) return;
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            pendingDeleteForm = form;
+            const isVisitor = !!form.querySelector('input[name="user_type"][value="visitor"]');
+            const row = form.closest('tr');
+            const name = row ? (row.querySelector('td strong')?.textContent?.trim() || '') : '';
+            if (deleteTitle) {
+                deleteTitle.innerHTML = isVisitor
+                    ? '<i class="fas fa-exclamation-triangle" style="color:#dc3545;"></i> Delete Visitor?'
+                    : '<i class="fas fa-exclamation-triangle" style="color:#dc3545;"></i> Delete Employee?';
+            }
+            if (deleteHeading) {
+                deleteHeading.textContent = isVisitor
+                    ? 'This visitor will be permanently deleted.'
+                    : 'This employee will be permanently deleted.';
+            }
+            if (deleteNameEl) {
+                deleteNameEl.textContent = name ? '"' + name + '"' : '';
+            }
+            if (deleteMsgEl) {
+                deleteMsgEl.textContent = isVisitor
+                    ? 'This action cannot be undone.'
+                    : 'This action may also remove related attendance, schedule, fingerprint and credential records. This cannot be undone. Only Inactive employees can be deleted.';
+            }
+            if (confirmBtn) {
+                confirmBtn.innerHTML = isVisitor
+                    ? '<i class="fas fa-trash"></i> Delete Visitor'
+                    : '<i class="fas fa-trash"></i> Delete Employee';
+            }
+            if (deleteModal) {
+                deleteModal.show();
+            } else {
+                if (confirm(isVisitor ? 'Are you sure you want to delete this visitor?' : 'Delete this employee? This action may also remove related records.')) {
+                    pendingDeleteForm.submit();
+                }
+            }
+        });
+    });
+
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', function() {
+            if (deleteModal) deleteModal.hide();
+            setTimeout(function() {
+                if (pendingDeleteForm) pendingDeleteForm.submit();
+            }, 300);
+        });
+    }
+
+    if (deleteModalEl) {
+        deleteModalEl.addEventListener('hidden.bs.modal', function() {
+            pendingDeleteForm = null;
+        });
     }
 });
 </script>

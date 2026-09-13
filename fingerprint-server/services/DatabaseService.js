@@ -20,6 +20,8 @@ class DatabaseService {
     static async initialize() {
         if (this.pool) return this.pool;
 
+        const useSSL = String(process.env.DB_SSL || '').toLowerCase() === 'true';
+
         this.pool = mysql.createPool({
             host: process.env.DB_HOST || 'localhost',
             port: process.env.DB_PORT || 3306,
@@ -28,7 +30,9 @@ class DatabaseService {
             database: process.env.DB_NAME || 'attendance_app',
             waitForConnections: true,
             connectionLimit: 10,
-            queueLimit: 0
+            queueLimit: 0,
+            connectTimeout: 15000,
+            ...(useSSL ? { ssl: { rejectUnauthorized: false } } : {})
         });
 
         // Test connection

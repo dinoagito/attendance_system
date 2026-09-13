@@ -12,23 +12,80 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
+const https = require('https');
+const fs = require('fs');
+const path = require('path');
 const WebSocket = require('ws');
 const FingerprintService = require('./services/ZKFingerprintService');
 const DatabaseService = require('./services/DatabaseService');
 const routes = require('./routes');
 
 const app = express();
-const server = http.createServer(app);
 const PORT = process.env.PORT || 3001;
 const RETRY_DELAY_MS = 5000;
 
-// WebSocket server for real-time communication with browser
+// HTTPS dual-mode: use TLS when FINGERPRINT_SSL=true and cert files exist, else fall back to HTTP
+const useHttpsEnv = String(process.env.FINGERPRINT_SSL || 'true').toLowerCase();
+const wantHttps = useHttpsEnv !== 'false' && useHttpsEnv !== '0';
+const tlsKeyPath = process.env.TLS_KEY_PATH || path.join(__dirname, 'certs', '127.0.0.1+2-key.pem');
+const tlsCertPath = process.env.TLS_CERT_PATH || path.join(__dirname, 'certs', '127.0.0.1+2.pem');
+let server;
+let isHttps = false;
+if (wantHttps && fs.existsSync(tlsKeyPath) && fs.existsSync(tlsCertPath)) {
+    try {
+        const tlsOptions = {
+            key: fs.readFileSync(tlsKeyPath),
+            cert: fs.readFileSync(tlsCertPath)
+        };
+        server = https.createServer(tlsOptions, app);
+        isHttps = true;
+    } catch (err) {
+        console.warn(`⚠️  Failed to load TLS certs (${tlsKeyPath}, ${tlsCertPath}): ${err.message}`);
+        console.warn('   Falling back to HTTP');
+        server = http.createServer(app);
+    }
+} else {
+    if (wantHttps) {
+        console.log(`ℹ️  TLS certs not found (${tlsKeyPath}, ${tlsCertPath}) — running in HTTP fallback mode`);
+    }
+    server = http.createServer(app);
+}
+
+// WebSocket server for real-time communication with browser (works with both http and https)
 const wss = new WebSocket.Server({ server, path: '/ws' });
 
 // Middleware
+const defaultOrigins = [
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'https://attendancesystem-production-e301.up.railway.app'
+];
+const configuredOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
+    : defaultOrigins;
+const allowedOrigins = [...new Set([...defaultOrigins, ...configuredOrigins])];
+
+// Private Network Access — allow the HTTPS Railway page to reach the
+// loopback fingerprint-server. Chrome sends `Access-Control-Request-Private-Network: true`
+// on the OPTIONS preflight for public → loopback; we must echo
+// `Access-Control-Allow-Private-Network: true`, otherwise Chrome blocks
+// with "Permission denied ... loopback address space" even though CORS origin is allowed.
+app.use((req, res, next) => {
+    if (req.headers['access-control-request-private-network']) {
+        res.setHeader('Access-Control-Allow-Private-Network', 'true');
+    }
+    next();
+});
+
 app.use(cors({
-    origin: ['http://localhost:8000', 'http://127.0.0.1:8000', 'http://localhost'],
-    credentials: true
+    origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(null, false);
+    },
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'Access-Control-Request-Private-Network'],
+    exposedHeaders: ['Access-Control-Allow-Private-Network']
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -177,16 +234,18 @@ async function startServer() {
             return;
         }
 
-        console.error('❌ HTTP server error:', error);
+        console.error(`❌ HTTP${isHttps ? 'S' : ''} server error:`, error);
         setTimeout(startServer, RETRY_DELAY_MS);
     });
 
     try {
+        const scheme = isHttps ? 'https' : 'http';
+        const wsScheme = isHttps ? 'wss' : 'ws';
         server.listen(PORT, async () => {
-            console.log(`\n🚀 Fingerprint Server running on port ${PORT}`);
-            console.log(`   REST API: http://localhost:${PORT}/api`);
-            console.log(`   WebSocket: ws://localhost:${PORT}/ws`);
-            console.log(`   Health Check: http://localhost:${PORT}/health\n`);
+            console.log(`\n🚀 Fingerprint Server running on port ${PORT} (${isHttps ? 'HTTPS' : 'HTTP'})`);
+            console.log(`   REST API: ${scheme}://localhost:${PORT}/api`);
+            console.log(`   WebSocket: ${wsScheme}://localhost:${PORT}/ws`);
+            console.log(`   Health Check: ${scheme}://localhost:${PORT}/health\n`);
             await initializeServices();
         });
     } catch (error) {
@@ -196,7 +255,7 @@ async function startServer() {
             return;
         }
 
-        console.error('❌ Failed to start HTTP listener:', error);
+        console.error(`❌ Failed to start ${isHttps ? 'HTTPS' : 'HTTP'} listener:`, error);
         setTimeout(startServer, RETRY_DELAY_MS);
     }
 }

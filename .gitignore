@@ -18,7 +18,17 @@
 /public/storage
 /storage/*.key
 /storage/pail
+
+# Fingerprint-server local HTTPS certs (mkcert) — never commit private keys
+/fingerprint-server/certs/*.pem
+/fingerprint-server/certs/*.key
+/fingerprint-server/certs/*.crt
+/fingerprint-server/certs/*.csr
+!fingerprint-server/certs/.gitkeep
 /vendor
 Homestead.json
 Homestead.yaml
 Thumbs.db
+.env.local.backup
+railway_data.sql
+railway_data_sanitized.sql
