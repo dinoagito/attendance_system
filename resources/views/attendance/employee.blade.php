@@ -34,7 +34,7 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div class="col-lg-2 col-md-3 col-sm-6 col-12">
+                        <div class="col-lg-3 col-md-3 col-sm-6 col-12">
                             <label class="form-label text-nowrap">Employee Name / Employee No.</label>
                             <input type="text" name="employee" class="form-control w-100"
                                    value="{{ $filters['employee'] ?? '' }}" placeholder="Type name or employee no.">
@@ -48,16 +48,11 @@
                             <input type="date" name="date_to" class="form-control w-100" value="{{ $filters['date_to'] ?? '' }}">
                         </div>
                         <div class="col-lg-1 col-md-2 col-sm-4 col-6">
-                            <button type="submit" name="action" value="search" class="btn btn-primary w-100 text-nowrap">
+                            <button type="submit" class="btn btn-primary w-100 text-nowrap">
                                 <i class="fas fa-search"></i> Search
                             </button>
                         </div>
-                        <div class="col-lg-2 col-md-3 col-sm-8 col-6">
-                            <button type="submit" name="action" value="all" class="btn btn-info w-100 text-nowrap" style="color: white;">
-                                <i class="fas fa-users"></i> All Employees
-                            </button>
-                        </div>
-                        <div class="col-lg-1 col-md-2 col-sm-12 col-12">
+                        <div class="col-lg-2 col-md-2 col-sm-8 col-6">
                             <a href="{{ route('attendance.employee') }}" class="btn btn-secondary w-100 text-nowrap" style="color: white;">
                                 <i class="fas fa-redo"></i> Reset
                             </a>
@@ -82,12 +77,6 @@
                 @endif
             </div>
             <div class="card-body">
-                @if(is_null($employees))
-                    <div style="padding: 60px; text-align: center; color: #999;">
-                        <i class="fas fa-search" style="font-size: 48px; margin-bottom: 20px; display: block;"></i>
-                        <h5>Select a filter and click Search to view attendance records.</h5>
-                    </div>
-                @else
                 @forelse($employees as $employee)
                     @php
                         $records = $employee->attendances;
@@ -233,7 +222,6 @@
                 <nav style="margin-top: 20px;">
                     {{ $employees->links() }}
                 </nav>
-                @endif
             </div>
         </div>
     </div>
