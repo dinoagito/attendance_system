@@ -564,12 +564,6 @@
                     </a>
                 </li>
                 <li class="sidebar-nav-item">
-                    <a href="{{ route('attendance.student') }}" class="sidebar-nav-link {{ request()->routeIs('attendance.student') ? 'active' : '' }}">
-                        <i class="fas fa-graduation-cap"></i>
-                        <span>Student Attendance</span>
-                    </a>
-                </li>
-                <li class="sidebar-nav-item">
                     <a href="{{ route('attendance.employee') }}" class="sidebar-nav-link {{ request()->routeIs('attendance.employee') ? 'active' : '' }}">
                         <i class="fas fa-users"></i>
                         <span>Employee Attendance</span>
@@ -579,24 +573,6 @@
                     <a href="{{ route('attendance.visitor') }}" class="sidebar-nav-link {{ request()->routeIs('attendance.visitor') ? 'active' : '' }}">
                         <i class="fas fa-user-check"></i>
                         <span>Visitor Log</span>
-                    </a>
-                </li>
-                <li class="sidebar-nav-item">
-                    <a href="{{ route('scan.student') }}" class="sidebar-nav-link {{ request()->routeIs('scan.student') ? 'active' : '' }}">
-                        <i class="fas fa-qrcode"></i>
-                        <span>RFID Scan</span>
-                    </a>
-                </li>
-                <li class="sidebar-nav-item">
-                    <a href="{{ route('scan.employee.zk9500') }}" class="sidebar-nav-link {{ request()->routeIs('scan.employee*') ? 'active' : '' }}">
-                        <i class="fas fa-fingerprint"></i>
-                        <span>Biometric Scan</span>
-                    </a>
-                </li>
-                <li class="sidebar-nav-item">
-                    <a href="{{ route('visitor.register') }}" class="sidebar-nav-link {{ request()->routeIs('visitor.register') ? 'active' : '' }}">
-                        <i class="fas fa-address-book"></i>
-                        <span>Register Visitor</span>
                     </a>
                 </li>
                 <li class="sidebar-nav-item">
@@ -616,25 +592,28 @@
                     <button class="topbar-toggle" id="sidebarToggle">
                         <i class="fas fa-bars"></i>
                     </button>
-                    <div class="topbar-search">
-                        <i class="fas fa-search"></i>
-                        <input type="text" placeholder="Search...">
-                    </div>
                 </div>
                 <div class="topbar-right">
-                    <button class="topbar-icon-btn">
-                        <i class="fas fa-bell"></i>
-                        <span class="badge badge-danger">3</span>
-                    </button>
+                
+                    @auth
                     <div class="topbar-profile">
                         <div class="topbar-profile-pic">
                             <i class="fas fa-user"></i>
                         </div>
                         <div>
-                            <div style="font-size: 14px; font-weight: 500;">Admin</div>
+                            <div style="font-size: 14px; font-weight: 500;">{{ Auth::user()->name }}</div>
                             <div style="font-size: 12px; color: #999;">Administrator</div>
                         </div>
                     </div>
+                    <form method="POST" action="{{ route('logout') }}" class="d-inline">
+                        @csrf
+                        <button type="submit" class="btn btn-sm btn-outline-secondary" title="Logout">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </button>
+                    </form>
+                    @else
+                    <a href="{{ route('login') }}" class="btn btn-sm btn-outline-primary">Login</a>
+                    @endauth
                 </div>
             </div>
 

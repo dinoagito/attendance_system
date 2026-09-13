@@ -67,26 +67,8 @@
             </div>
         </div>
 
-        <!-- Enrollment Section -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <i class="fas fa-user-plus"></i> Enroll New Biometric
-            </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <label class="form-label">Select Employee</label>
-                    <select id="enroll-employee" class="form-select">
-                        <option value="">-- Select Employee --</option>
-                        @foreach($employees as $emp)
-                            <option value="{{ $emp->id }}">{{ $emp->name }} ({{ $emp->employee_id_number }})</option>
-                        @endforeach
-                    </select>
-                </div>
-                <button id="btn-enroll" class="btn btn-success w-100">
-                    <i class="fas fa-fingerprint"></i> Enroll Biometric
-                </button>
-            </div>
-        </div>
+        <!-- Enrollment moved to admin-only: Registration Management → Employee → Fingerprint → Enroll Fingerprint ( /scan/employee/zk9500/enroll ) -->
+        <!-- Verification-only kiosk: no enrollment here -->
     </div>
 
     <!-- Scan Result -->
@@ -598,20 +580,55 @@
                 publicKey: publicKeyOptions
             });
 
-            // Verify with server
+            // Verify with server — include selected employee for strict check (if a specific employee is selected, only that employee's fingerprint is accepted)
+            const selectedEmployeeId = enrollEmployee && enrollEmployee.value ? parseInt(enrollEmployee.value) : null;
+            const verifyPayload = {
+                credential_id: bufferToBase64Url(assertion.rawId)
+            };
+            if (selectedEmployeeId) {
+                verifyPayload.employee_id = selectedEmployeeId;
+            }
             const verifyResponse = await fetch('/webauthn/authenticate/verify', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': '{{ csrf_token() }}'
                 },
-                body: JSON.stringify({
-                    credential_id: bufferToBase64Url(assertion.rawId)
-                })
+                body: JSON.stringify(verifyPayload)
             });
 
             const verifyData = await verifyResponse.json();
             
+            // Schedule validation: reject if employee has no schedule today
+            if (verifyData.schedule_valid === false || verifyData.attendance?.action === 'no_schedule') {
+                scannerVisual.className = 'scanner-container error';
+                updateStatus('error', 'No Schedule Today', verifyData.message);
+                showWebauthnNotification({
+                    title: 'No Schedule Today',
+                    message: verifyData.message,
+                    type: 'warning',
+                });
+                document.getElementById('error-message').textContent = verifyData.message;
+                showResult('error');
+                playSound('error');
+                return;
+            }
+
+            // Strict verification: fingerprint must belong to selected employee
+            if (verifyData.success === false && verifyData.matched === false && verifyData.message && verifyData.message.toLowerCase().includes('does not belong')) {
+                scannerVisual.className = 'scanner-container error';
+                updateStatus('error', 'Verification Failed', verifyData.message);
+                showWebauthnNotification({
+                    title: 'Verification Failed',
+                    message: verifyData.message,
+                    type: 'danger',
+                });
+                document.getElementById('error-message').textContent = verifyData.message;
+                showResult('error');
+                playSound('error');
+                return;
+            }
+
             if (verifyData.matched) {
                 scannerVisual.className = 'scanner-container success';
                 updateStatus('success', 'Verified!', `Welcome, ${verifyData.employee.name}!`);
@@ -710,7 +727,7 @@
 
     function setScanning(scanning) {
         btnScan.disabled = scanning;
-        btnEnroll.disabled = scanning;
+        if (btnEnroll) btnEnroll.disabled = scanning;
         btnScan.innerHTML = scanning 
             ? '<i class="fas fa-circle-notch fa-spin"></i> Scanning...' 
             : '<i class="fas fa-fingerprint"></i> Start Scanning';
@@ -774,16 +791,16 @@
         document.getElementById('current-time').textContent = new Date().toLocaleTimeString();
     }
 
-    // Event listeners
+    // Event listeners - verification-only kiosk (enrollment is admin-only via Registration Management)
     btnScan.addEventListener('click', function() {
         console.log('Scan button clicked!');
         verifyBiometric();
     });
     btnReset.addEventListener('click', resetScan);
-    btnEnroll.addEventListener('click', function() {
-        console.log('Enroll button clicked!');
-        enrollBiometric();
-    });
+    if (btnEnroll) {
+        btnEnroll.style.display = 'none';
+        // Enrollment removed from kiosk
+    }
     if (btnRefresh) btnRefresh.addEventListener('click', loadTodayAttendance);
 
     document.addEventListener('DOMContentLoaded', function() {

@@ -14,7 +14,7 @@ function startChild() {
     child = spawn(process.execPath, ['server.js'], {
         cwd: __dirname,
         stdio: 'inherit',
-        windowsHide: false,
+        windowsHide: true,
     });
 
     child.on('exit', (code, signal) => {

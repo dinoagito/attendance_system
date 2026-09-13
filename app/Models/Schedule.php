@@ -10,7 +10,6 @@ class Schedule extends Model
 
     protected $fillable = [
         'employee_id',
-        'student_id',
         'user_type',
         'name',
         'day_of_week',
@@ -25,19 +24,11 @@ class Schedule extends Model
     ];
 
     /**
-     * Get the employee that owns this schedule
+     * Get the employee/faculty that owns this schedule
      */
     public function employee()
     {
         return $this->belongsTo(Employee::class, 'employee_id');
-    }
-
-    /**
-     * Get the student that owns this schedule
-     */
-    public function student()
-    {
-        return $this->belongsTo(Student::class, 'student_id');
     }
 
     /**
@@ -56,12 +47,21 @@ class Schedule extends Model
     }
 
     /**
-     * Build a stable key for one logical schedule group.
+     * Build a stable key for one logical schedule group for Employee/Faculty.
      */
     public static function buildGroupKey(string $userType, ?int $employeeId, ?int $studentId, array $days, string $startTime, string $endTime): string
     {
-        $identifier = $userType === 'employee' ? 'employee:' . $employeeId : 'student:' . $studentId;
+        // Student parameter kept for backward compatibility but ignored - system is now Employee/Faculty only
+        $identifier = 'employee:' . $employeeId;
         return sha1($identifier . '|' . implode(',', $days) . '|' . $startTime . '|' . $endTime);
+    }
+
+    /**
+     * Overload to support legacy calls with 6 params, but primary is employee-only
+     */
+    public static function buildGroupKeyForEmployee(int $employeeId, array $days, string $startTime, string $endTime): string
+    {
+        return self::buildGroupKey('employee', $employeeId, null, $days, $startTime, $endTime);
     }
 
     /**

@@ -6,8 +6,8 @@
 <div class="page-header">
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <div>
-            <h1>Schedule Management</h1>
-            <p>View and manage work schedules</p>
+            <h1>Schedule Management - Employees / Faculty</h1>
+            <p>View and manage work schedules for employees and faculty</p>
         </div>
         <a href="{{ route('users.index') }}" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Back to Registration Management
@@ -55,7 +55,6 @@
                     <table class="table table-hover">
                         <thead>
                             <tr>
-                                <th>Type</th>
                                 <th>Name</th>
                                 <th>Days</th>
                                 <th>Time In</th>
@@ -69,18 +68,10 @@
                             @forelse($schedules as $schedule)
                                 <tr>
                                     <td>
-                                        <span style="font-size: 12px; background-color: {{ $schedule->user_type === 'employee' ? '#e3f2fd' : '#f3e5f5' }}; color: {{ $schedule->user_type === 'employee' ? '#1976d2' : '#7b1fa2' }}; padding: 4px 8px; border-radius: 3px;">
-                                            {{ ucfirst($schedule->user_type ?? 'Template') }}
-                                        </span>
-                                    </td>
-                                    <td>
                                         <div style="font-weight: 500;">
-                                            @if($schedule->user_type === 'employee' && $schedule->employee)
+                                            @if($schedule->employee)
                                                 {{ $schedule->employee->full_name }}
-                                                <div style="font-size: 12px; color: #999;">{{ $schedule->employee->employee_id_number }}</div>
-                                            @elseif($schedule->user_type === 'student' && $schedule->student)
-                                                {{ $schedule->student->full_name }}
-                                                <div style="font-size: 12px; color: #999;">{{ $schedule->student->student_id_number }}</div>
+                                                <div style="font-size: 12px; color: #999;">{{ $schedule->employee->employee_id_number }} - {{ $schedule->employee->department ?? 'No Department' }}</div>
                                             @else
                                                 <span style="color: #999;">Unassigned Template</span>
                                             @endif
@@ -107,9 +98,7 @@
                                                 title="Edit"
                                                 onclick="openEditSchedule(this)"
                                                 data-id="{{ $schedule->ids[0] }}"
-                                                data-user-type="{{ $schedule->user_type }}"
                                                 data-employee-id="{{ $schedule->employee_id }}"
-                                                data-student-id="{{ $schedule->student_id }}"
                                                 data-days='@json($schedule->days)'
                                                 data-start-time="{{ \Carbon\Carbon::parse($schedule->start_time)->format('H:i') }}"
                                                 data-end-time="{{ \Carbon\Carbon::parse($schedule->end_time)->format('H:i') }}"
@@ -124,7 +113,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" style="text-align: center; padding: 30px; color: #999;">
+                                    <td colspan="6" style="text-align: center; padding: 30px; color: #999;">
                                         <i class="fas fa-inbox"></i> No schedules found
                                     </td>
                                 </tr>
@@ -142,41 +131,22 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Add New Schedule</h5>
+                <h5 class="modal-title">Add New Schedule - Employee / Faculty</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="{{ route('schedule.store') }}" id="addScheduleForm">
                 @csrf
                 <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">User Type *</label>
-                            <select name="user_type" id="userType" class="form-control @error('user_type') is-invalid @enderror" required onchange="updateUserDropdown()">
-                                <option value="">Select User Type</option>
-                                <option value="employee">Employee</option>
-                                <option value="student">Student</option>
-                            </select>
-                            @error('user_type') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Select User *</label>
-                            <input type="text" id="employeeSearch" class="form-control mb-2" placeholder="Search employee by name or ID" style="display: none;">
-                            <select name="employee_id" id="employeeSelect" class="form-control @error('employee_id') is-invalid @enderror" style="display: none;">
-                                <option value="">Select Employee</option>
-                                @foreach($employees as $employee)
-                                    <option value="{{ $employee->id }}">{{ $employee->full_name }} ({{ $employee->employee_id_number }})</option>
-                                @endforeach
-                            </select>
-                            <input type="text" id="studentSearch" class="form-control mb-2" placeholder="Search student by name or ID" style="display: none;">
-                            <select name="student_id" id="studentSelect" class="form-control @error('student_id') is-invalid @enderror" style="display: none;">
-                                <option value="">Select Student</option>
-                                @foreach($students as $student)
-                                    <option value="{{ $student->id }}">{{ $student->full_name }} ({{ $student->student_id_number }})</option>
-                                @endforeach
-                            </select>
-                            @error('employee_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                            @error('student_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label">Select Employee / Faculty *</label>
+                        <input type="text" id="employeeSearch" class="form-control mb-2" placeholder="Search employee by name or ID">
+                        <select name="employee_id" id="employeeSelect" class="form-control @error('employee_id') is-invalid @enderror" required>
+                            <option value="">Select Employee / Faculty</option>
+                            @foreach($employees as $employee)
+                                <option value="{{ $employee->id }}">{{ $employee->full_name }} ({{ $employee->employee_id_number }}) - {{ $employee->department ?? 'No Department' }}</option>
+                            @endforeach
+                        </select>
+                        @error('employee_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
 
                     <div class="mb-3">
@@ -219,7 +189,7 @@
                     <div class="card" id="schedulePreviewCard" style="background: #f8fbff; border: 1px solid #dce8f5;">
                         <div class="card-body" style="padding: 12px 14px;">
                             <div style="font-size: 12px; color: #6c757d; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;">Live Preview</div>
-                            <div id="schedulePreviewText" style="margin-top: 6px; color: #2c3e50;">Select user, days, and time to preview schedule summary.</div>
+                            <div id="schedulePreviewText" style="margin-top: 6px; color: #2c3e50;">Select employee, days, and time to preview schedule summary.</div>
                         </div>
                     </div>
                 </div>
@@ -245,32 +215,15 @@
                 @method('PUT')
                 <input type="hidden" id="editScheduleRecordId" value="">
                 <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">User Type *</label>
-                            <select name="user_type" id="editUserType" class="form-control" required onchange="updateEditUserDropdown()">
-                                <option value="">Select User Type</option>
-                                <option value="employee">Employee</option>
-                                <option value="student">Student</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Select User *</label>
-                            <input type="text" id="editEmployeeSearch" class="form-control mb-2" placeholder="Search employee by name or ID" style="display: none;">
-                            <select name="employee_id" id="editEmployeeSelect" class="form-control" style="display: none;">
-                                <option value="">Select Employee</option>
-                                @foreach($employees as $employee)
-                                    <option value="{{ $employee->id }}">{{ $employee->full_name }} ({{ $employee->employee_id_number }})</option>
-                                @endforeach
-                            </select>
-                            <input type="text" id="editStudentSearch" class="form-control mb-2" placeholder="Search student by name or ID" style="display: none;">
-                            <select name="student_id" id="editStudentSelect" class="form-control" style="display: none;">
-                                <option value="">Select Student</option>
-                                @foreach($students as $student)
-                                    <option value="{{ $student->id }}">{{ $student->full_name }} ({{ $student->student_id_number }})</option>
-                                @endforeach
-                            </select>
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label">Select Employee / Faculty *</label>
+                        <input type="text" id="editEmployeeSearch" class="form-control mb-2" placeholder="Search employee by name or ID">
+                        <select name="employee_id" id="editEmployeeSelect" class="form-control" required>
+                            <option value="">Select Employee / Faculty</option>
+                            @foreach($employees as $employee)
+                                <option value="{{ $employee->id }}">{{ $employee->full_name }} ({{ $employee->employee_id_number }})</option>
+                            @endforeach
+                        </select>
                     </div>
 
                     <div class="mb-3">
@@ -302,7 +255,7 @@
                     <div class="card" style="background: #f8fbff; border: 1px solid #dce8f5;">
                         <div class="card-body" style="padding: 12px 14px;">
                             <div style="font-size: 12px; color: #6c757d; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;">Live Preview</div>
-                            <div id="editSchedulePreviewText" style="margin-top: 6px; color: #2c3e50;">Select user, days, and time to preview schedule summary.</div>
+                            <div id="editSchedulePreviewText" style="margin-top: 6px; color: #2c3e50;">Select employee, days, and time to preview schedule summary.</div>
                         </div>
                     </div>
                 </div>
@@ -319,9 +272,7 @@
     $existingScheduleRules = $schedules->map(function ($schedule) {
         return [
             'id' => $schedule->ids[0] ?? null,
-            'user_type' => $schedule->user_type,
             'employee_id' => $schedule->employee_id,
-            'student_id' => $schedule->student_id,
             'days' => $schedule->days,
             'start_time' => \Carbon\Carbon::parse($schedule->start_time)->format('H:i'),
             'end_time' => \Carbon\Carbon::parse($schedule->end_time)->format('H:i'),
@@ -347,7 +298,7 @@ function cacheSelectOptions(selectId) {
 function rebuildSelectOptions(selectId, query) {
     const select = document.getElementById(selectId);
     const options = searchableOptionsCache[selectId] || [];
-    const placeholderText = selectId.toLowerCase().includes('student') ? 'Select Student' : 'Select Employee';
+    const placeholderText = 'Select Employee / Faculty';
     const currentValue = select.value;
     const normalizedQuery = (query || '').trim().toLowerCase();
 
@@ -381,51 +332,6 @@ function setupSearchableSelect(searchInputId, selectId) {
         rebuildSelectOptions(selectId, searchInput.value);
         refreshAddScheduleInsights();
     });
-}
-
-function updateUserDropdown() {
-    const userType = document.getElementById('userType').value;
-    const employeeSearch = document.getElementById('employeeSearch');
-    const employeeSelect = document.getElementById('employeeSelect');
-    const studentSearch = document.getElementById('studentSearch');
-    const studentSelect = document.getElementById('studentSelect');
-    
-    if (userType === 'employee') {
-        employeeSearch.style.display = 'block';
-        employeeSelect.style.display = 'block';
-        employeeSelect.required = true;
-        studentSearch.style.display = 'none';
-        studentSelect.style.display = 'none';
-        studentSelect.required = false;
-        studentSearch.value = '';
-        rebuildSelectOptions('studentSelect', '');
-        studentSelect.value = '';
-    } else if (userType === 'student') {
-        studentSearch.style.display = 'block';
-        studentSelect.style.display = 'block';
-        studentSelect.required = true;
-        employeeSearch.style.display = 'none';
-        employeeSelect.style.display = 'none';
-        employeeSelect.required = false;
-        employeeSearch.value = '';
-        rebuildSelectOptions('employeeSelect', '');
-        employeeSelect.value = '';
-    } else {
-        employeeSearch.style.display = 'none';
-        employeeSelect.style.display = 'none';
-        studentSearch.style.display = 'none';
-        studentSelect.style.display = 'none';
-        employeeSelect.required = false;
-        studentSelect.required = false;
-        employeeSearch.value = '';
-        studentSearch.value = '';
-        rebuildSelectOptions('employeeSelect', '');
-        rebuildSelectOptions('studentSelect', '');
-        employeeSelect.value = '';
-        studentSelect.value = '';
-    }
-
-    refreshAddScheduleInsights();
 }
 
 function parseTimeToMinutes(timeValue) {
@@ -489,16 +395,12 @@ function applyDayPreset(preset) {
 }
 
 function refreshAddScheduleInsights() {
-    const userType = document.getElementById('userType').value;
     const employeeSelect = document.getElementById('employeeSelect');
-    const studentSelect = document.getElementById('studentSelect');
     const selectedDays = getSelectedAddDays();
     const startTime = document.getElementById('addStartTime').value;
     const endTime = document.getElementById('addEndTime').value;
 
-    const selectedUserName = userType === 'employee'
-        ? (employeeSelect.options[employeeSelect.selectedIndex]?.text || 'No user selected')
-        : (studentSelect.options[studentSelect.selectedIndex]?.text || 'No user selected');
+    const selectedUserName = employeeSelect.options[employeeSelect.selectedIndex]?.text || 'No employee selected';
 
     const preview = document.getElementById('schedulePreviewText');
     const startMinutes = parseTimeToMinutes(startTime);
@@ -507,25 +409,20 @@ function refreshAddScheduleInsights() {
         ? ((endMinutes - startMinutes) / 60)
         : null;
 
-    preview.textContent = `User: ${selectedUserName} | Days: ${formatSelectedDays(selectedDays)} | Time: ${formatTime12h(startTime)} - ${formatTime12h(endTime)}${durationHours ? ` | Duration: ${durationHours}h` : ''}`;
+    preview.textContent = `Employee: ${selectedUserName} | Days: ${formatSelectedDays(selectedDays)} | Time: ${formatTime12h(startTime)} - ${formatTime12h(endTime)}${durationHours ? ` | Duration: ${durationHours}h` : ''}`;
 
     const warning = document.getElementById('scheduleConflictWarning');
     warning.style.display = 'none';
     warning.textContent = '';
 
-    const selectedUserId = userType === 'employee' ? employeeSelect.value : studentSelect.value;
-    if (!userType || !selectedUserId || selectedDays.length === 0 || startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
+    const selectedUserId = employeeSelect.value;
+    if (!selectedUserId || selectedDays.length === 0 || startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
         return;
     }
 
     const conflicts = [];
     existingScheduleRules.forEach(rule => {
-        const sameUser = (rule.user_type === userType) && (
-            (userType === 'employee' && String(rule.employee_id || '') === selectedUserId) ||
-            (userType === 'student' && String(rule.student_id || '') === selectedUserId)
-        );
-
-        if (!sameUser) {
+        if (String(rule.employee_id || '') !== selectedUserId) {
             return;
         }
 
@@ -549,54 +446,9 @@ function refreshAddScheduleInsights() {
 
     if (conflicts.length > 0) {
         const details = conflicts.map(conflict => `${formatSelectedDays(conflict.days)} (${formatTime12h(conflict.start)} - ${formatTime12h(conflict.end)})`).join('; ');
-        warning.textContent = `Possible schedule conflict detected for this user: ${details}`;
+        warning.textContent = `Possible schedule conflict detected for this employee: ${details}`;
         warning.style.display = 'block';
     }
-}
-
-function updateEditUserDropdown() {
-    const userType = document.getElementById('editUserType').value;
-    const employeeSearch = document.getElementById('editEmployeeSearch');
-    const employeeSelect = document.getElementById('editEmployeeSelect');
-    const studentSearch = document.getElementById('editStudentSearch');
-    const studentSelect = document.getElementById('editStudentSelect');
-
-    if (userType === 'employee') {
-        employeeSearch.style.display = 'block';
-        employeeSelect.style.display = 'block';
-        employeeSelect.required = true;
-        studentSearch.style.display = 'none';
-        studentSelect.style.display = 'none';
-        studentSelect.required = false;
-        studentSearch.value = '';
-        rebuildSelectOptions('editStudentSelect', '');
-        studentSelect.value = '';
-    } else if (userType === 'student') {
-        studentSearch.style.display = 'block';
-        studentSelect.style.display = 'block';
-        studentSelect.required = true;
-        employeeSearch.style.display = 'none';
-        employeeSelect.style.display = 'none';
-        employeeSelect.required = false;
-        employeeSearch.value = '';
-        rebuildSelectOptions('editEmployeeSelect', '');
-        employeeSelect.value = '';
-    } else {
-        employeeSearch.style.display = 'none';
-        employeeSelect.style.display = 'none';
-        studentSearch.style.display = 'none';
-        studentSelect.style.display = 'none';
-        employeeSelect.required = false;
-        studentSelect.required = false;
-        employeeSearch.value = '';
-        studentSearch.value = '';
-        rebuildSelectOptions('editEmployeeSelect', '');
-        rebuildSelectOptions('editStudentSelect', '');
-        employeeSelect.value = '';
-        studentSelect.value = '';
-    }
-
-    refreshEditScheduleInsights();
 }
 
 function getSelectedEditDays() {
@@ -604,17 +456,13 @@ function getSelectedEditDays() {
 }
 
 function refreshEditScheduleInsights() {
-    const userType = document.getElementById('editUserType').value;
     const employeeSelect = document.getElementById('editEmployeeSelect');
-    const studentSelect = document.getElementById('editStudentSelect');
     const selectedDays = getSelectedEditDays();
     const startTime = document.getElementById('editStartTime').value;
     const endTime = document.getElementById('editEndTime').value;
     const currentScheduleId = document.getElementById('editScheduleRecordId').value;
 
-    const selectedUserName = userType === 'employee'
-        ? (employeeSelect.options[employeeSelect.selectedIndex]?.text || 'No user selected')
-        : (studentSelect.options[studentSelect.selectedIndex]?.text || 'No user selected');
+    const selectedUserName = employeeSelect.options[employeeSelect.selectedIndex]?.text || 'No employee selected';
 
     const preview = document.getElementById('editSchedulePreviewText');
     const startMinutes = parseTimeToMinutes(startTime);
@@ -623,14 +471,14 @@ function refreshEditScheduleInsights() {
         ? ((endMinutes - startMinutes) / 60)
         : null;
 
-    preview.textContent = `User: ${selectedUserName} | Days: ${formatSelectedDays(selectedDays)} | Time: ${formatTime12h(startTime)} - ${formatTime12h(endTime)}${durationHours ? ` | Duration: ${durationHours}h` : ''}`;
+    preview.textContent = `Employee: ${selectedUserName} | Days: ${formatSelectedDays(selectedDays)} | Time: ${formatTime12h(startTime)} - ${formatTime12h(endTime)}${durationHours ? ` | Duration: ${durationHours}h` : ''}`;
 
     const warning = document.getElementById('editScheduleConflictWarning');
     warning.style.display = 'none';
     warning.textContent = '';
 
-    const selectedUserId = userType === 'employee' ? employeeSelect.value : studentSelect.value;
-    if (!userType || !selectedUserId || selectedDays.length === 0 || startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
+    const selectedUserId = employeeSelect.value;
+    if (!selectedUserId || selectedDays.length === 0 || startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
         return;
     }
 
@@ -640,12 +488,7 @@ function refreshEditScheduleInsights() {
             return;
         }
 
-        const sameUser = (rule.user_type === userType) && (
-            (userType === 'employee' && String(rule.employee_id || '') === selectedUserId) ||
-            (userType === 'student' && String(rule.student_id || '') === selectedUserId)
-        );
-
-        if (!sameUser) {
+        if (String(rule.employee_id || '') !== selectedUserId) {
             return;
         }
 
@@ -669,16 +512,14 @@ function refreshEditScheduleInsights() {
 
     if (conflicts.length > 0) {
         const details = conflicts.map(conflict => `${formatSelectedDays(conflict.days)} (${formatTime12h(conflict.start)} - ${formatTime12h(conflict.end)})`).join('; ');
-        warning.textContent = `Possible schedule conflict detected for this user: ${details}`;
+        warning.textContent = `Possible schedule conflict detected for this employee: ${details}`;
         warning.style.display = 'block';
     }
 }
 
 function openEditSchedule(button) {
     const id = button.dataset.id;
-    const userType = button.dataset.userType;
     const employeeId = button.dataset.employeeId;
-    const studentId = button.dataset.studentId;
     const days = JSON.parse(button.dataset.days || '[]');
     const startTime = button.dataset.startTime;
     const endTime = button.dataset.endTime;
@@ -687,14 +528,7 @@ function openEditSchedule(button) {
     form.action = `/schedule/${id}`;
     document.getElementById('editScheduleRecordId').value = id;
 
-    document.getElementById('editUserType').value = userType;
-    updateEditUserDropdown();
-
-    if (userType === 'employee') {
-        document.getElementById('editEmployeeSelect').value = employeeId || '';
-    } else if (userType === 'student') {
-        document.getElementById('editStudentSelect').value = studentId || '';
-    }
+    document.getElementById('editEmployeeSelect').value = employeeId || '';
 
     document.querySelectorAll('input[name="schedule_days[]"][id^="editDay"]').forEach(checkbox => {
         checkbox.checked = days.includes(checkbox.value);
@@ -721,14 +555,10 @@ function deleteSchedule(scheduleId) {
 
 document.addEventListener('DOMContentLoaded', function() {
     setupSearchableSelect('employeeSearch', 'employeeSelect');
-    setupSearchableSelect('studentSearch', 'studentSelect');
     setupSearchableSelect('editEmployeeSearch', 'editEmployeeSelect');
-    setupSearchableSelect('editStudentSearch', 'editStudentSelect');
 
     const addFormElements = [
-        document.getElementById('userType'),
         document.getElementById('employeeSelect'),
-        document.getElementById('studentSelect'),
         document.getElementById('addStartTime'),
         document.getElementById('addEndTime')
     ];
@@ -745,9 +575,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     const editFormElements = [
-        document.getElementById('editUserType'),
         document.getElementById('editEmployeeSelect'),
-        document.getElementById('editStudentSelect'),
         document.getElementById('editStartTime'),
         document.getElementById('editEndTime')
     ];

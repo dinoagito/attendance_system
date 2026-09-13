@@ -60,14 +60,6 @@
                 <div>
                     <i class="fas fa-table"></i> Visitor Records ({{ $visitors->total() }} total)
                 </div>
-                <form method="GET" action="{{ route('attendance.visitor.export') }}" style="display: inline;">
-                    @foreach(request()->query() as $key => $value)
-                        <input type="hidden" name="{{ $key }}" value="{{ $value }}">
-                    @endforeach
-                    <button type="submit" class="btn btn-primary btn-sm">
-                        <i class="fas fa-download"></i> Export
-                    </button>
-                </form>
             </div>
             <div class="card-body">
                 <div class="table-container">
@@ -123,6 +115,15 @@
                                     </td>
                                     <td>
                                         <div class="action-buttons">
+                                            @if($visitor->time_out)
+                                                <span class="action-btn" title="Checked Out" style="color: #28a745; cursor: default;">
+                                                    <i class="fas fa-check-circle"></i>
+                                                </span>
+                                            @else
+                                                <button type="button" class="action-btn" title="Check Out" onclick="checkOutFromLog({{ $visitor->id }}, this)" style="color: #198754;">
+                                                    <i class="fas fa-sign-out-alt"></i>
+                                                </button>
+                                            @endif
                                             <button class="action-btn" title="Edit" data-bs-toggle="modal" data-bs-target="#editVisitorModal" onclick="loadVisitor({{ $visitor->id }})">
                                                 <i class="fas fa-edit"></i>
                                             </button>
@@ -140,7 +141,7 @@
                     </table>
                 </div>
                 <div style="margin-top: 20px;">
-                    {{ $visitors->appends(request()->query())->links() }}
+                    {{ $visitors->appends(request()->query())->onEachSide(1)->links('pagination::bootstrap-5') }}
                 </div>
             </div>
         </div>
@@ -158,6 +159,7 @@
             <form method="POST" id="editVisitorForm">
                 @csrf
                 @method('PUT')
+                <input type="hidden" name="user_type" value="visitor">
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -172,7 +174,12 @@
 
                     <div class="mb-3">
                         <label class="form-label">Person to Visit</label>
-                        <input type="text" name="person_to_visit" id="visitor_person" class="form-control">
+                        <select name="person_to_visit" id="visitor_person" class="form-control">
+                            <option value="">Select employee</option>
+                            @foreach(($employees ?? []) as $employee)
+                                <option value="{{ $employee->id }}">{{ $employee->full_name }} - {{ $employee->department ?? 'No Department' }}</option>
+                            @endforeach
+                        </select>
                     </div>
 
                     <div class="mb-3">
@@ -206,6 +213,40 @@
 </div>
 
 <script>
+function formatDateForInput(value) {
+    if (!value) {
+        return '';
+    }
+
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return value;
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return '';
+    }
+
+    return date.toISOString().slice(0, 10);
+}
+
+function formatTimeForInput(value) {
+    if (!value) {
+        return '';
+    }
+
+    if (typeof value === 'string' && /^\d{2}:\d{2}(:\d{2})?$/.test(value)) {
+        return value.slice(0, 5);
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return '';
+    }
+
+    return date.toTimeString().slice(0, 5);
+}
+
 async function loadVisitor(visitorId) {
     try {
         const response = await fetch(`/api/visitors/${visitorId}`);
@@ -215,9 +256,9 @@ async function loadVisitor(visitorId) {
         document.getElementById('visitor_phone').value = visitor.phone || '';
         document.getElementById('visitor_person').value = visitor.person_to_visit || '';
         document.getElementById('visitor_purpose').value = visitor.purpose;
-        document.getElementById('visitor_date').value = visitor.date;
-        document.getElementById('visitor_time_in').value = visitor.time_in.substring(0, 5);
-        document.getElementById('visitor_time_out').value = visitor.time_out ? visitor.time_out.substring(0, 5) : '';
+        document.getElementById('visitor_date').value = formatDateForInput(visitor.date);
+        document.getElementById('visitor_time_in').value = formatTimeForInput(visitor.time_in);
+        document.getElementById('visitor_time_out').value = formatTimeForInput(visitor.time_out);
         
         const form = document.getElementById('editVisitorForm');
         form.action = `/users/${visitorId}`;
@@ -225,6 +266,42 @@ async function loadVisitor(visitorId) {
         console.error('Error loading visitor:', error);
         alert('Failed to load visitor data');
     }
+}
+
+function checkOutFromLog(id, btn) {
+    if (!confirm('Check out this visitor now? This will record the current time automatically.')) return;
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btn.style.opacity = '0.6';
+    }
+    fetch(`/visitor/${id}/checkout`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+        }
+    })
+    .then(async response => {
+        const data = await response.json().catch(() => null);
+        if (response.status === 409 && data?.visitor) {
+            alert(data.message || 'Visitor already checked out.');
+            location.reload();
+            return;
+        }
+        if (!response.ok) throw new Error(data?.message || 'Unable to check out visitor.');
+        alert(data.message || 'Visitor checked out successfully.');
+        location.reload();
+    })
+    .catch(error => {
+        console.error('Check out error:', error);
+        alert(error.message || 'Unable to check out visitor.');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-sign-out-alt"></i>';
+            btn.style.opacity = '1';
+        }
+    });
 }
 </script>
 @endsection

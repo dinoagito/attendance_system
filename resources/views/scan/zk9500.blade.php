@@ -1,8 +1,10 @@
-@extends('layouts.app')
+@extends('layouts.public')
 
 @section('title', 'Fingerprint Scanner - ZK9500')
 
 @section('content')
+<button id="kiosk-fullscreen-prompt" class="btn btn-dark btn-sm d-none" title="Press F to enter fullscreen"><i class="fas fa-expand"></i> Enter Fullscreen (Press F)</button>
+<div id="kiosk-fullscreen-hint"><i class="fas fa-info-circle"></i> Kiosk mode — press <kbd>F</kbd> for fullscreen | <kbd>Enter</kbd> Continue | <kbd>Space</kbd> Scan</div>
 @php
     $employeeDirectory = $employees->map(function ($emp) {
         return [
@@ -50,13 +52,145 @@
                     <button id="btn-clear-employee-no" type="button" class="btn btn-secondary btn-lg">Clear</button>
                 </div>
             </div>
+            <div class="frame1-today-wrapper" style="grid-column: 1 / -1;">
+                <button class="btn btn-outline-light btn-sm w-100 d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#frame1-today-collapse" aria-expanded="true" style="background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.3); color: white;">
+                    <span><i class="fas fa-calendar-alt"></i> Today's Record</span>
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                <div id="frame1-today-collapse" class="collapse show mt-3">
+                    <div class="card" style="margin-bottom:0;">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span><i class="fas fa-calendar-alt"></i> Today's Record</span>
+                            <div class="d-flex gap-2 align-items-center">
+                                <button id="btn-display-all" class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-users"></i> Display All Employees
+                                </button>
+                                <button id="btn-view-all-today" class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-list"></i> View All (Modal)
+                                </button>
+                                <button id="btn-refresh" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-sync-alt"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body" style="max-height: 320px; overflow-y: auto;">
+                            <div id="today-record-search-wrap" class="mb-3 d-none">
+                                <input id="today-record-search-main" type="search" class="form-control form-control-sm" placeholder="Search employee by name...">
+                            </div>
+                            <div id="today-record-container">
+                                <div class="text-center text-muted py-4">
+                                    <p class="mb-2"><i class="fas fa-calendar-check"></i> <strong id="today-date">-- -- ----</strong></p>
+                                    <p class="mb-0" id="today-record-status">No scans recorded yet.</p>
+                                </div>
+                            </div>
+                            <div id="today-record-list" class="d-none">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div>
+                                        <h6 class="mb-1" id="today-record-employee-name">--</h6>
+                                        <small class="text-muted" id="today-record-employee-id">--</small>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm" id="today-record-table">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Employee No.</th>
+                                                <th>Name</th>
+                                                <th>Time In</th>
+                                                <th>Time Out</th>
+                                                <th>Time In</th>
+                                                <th>Time Out</th>
+                                                <th>Time In</th>
+                                                <th>Time Out</th>
+                                                <th>Time In</th>
+                                                <th>Time Out</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="today-record-tbody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fingerprint Scanning Modal - appears after entering employee number, contains image, auto-ready without Space -->
+    <div class="modal fade" id="scannerModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-fingerprint"></i> Scan Fingerprint - <span id="modal-employee-name">--</span> <small class="text-muted" id="modal-employee-id">--</small></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center" id="scanner-modal-body">
+                    <div id="scanner-visual-modal" class="scanner-container mb-4" style="margin: 0 auto;">
+                        <div class="scanner-icon"><i class="fas fa-fingerprint"></i></div>
+                        <div class="scanner-ring"></div>
+                    </div>
+                    <div id="scan-status-modal" class="status-box status-waiting mb-4">
+                        <h5 id="status-title-modal">Ready to Scan</h5>
+                        <p id="status-message-modal" class="mb-0">
+                            <i class="fas fa-hand-point-up"></i>
+                            Place your finger on the scanner — scanning will start automatically
+                        </p>
+                    </div>
+                    <div id="result-matched-modal" class="d-none text-center">
+                        <div class="verified-banner mb-4">
+                            <div class="verified-badge">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Identity Verified</span>
+                            </div>
+                            <div class="match-score-chip" id="match-score-modal">Identity Match: 100%</div>
+                        </div>
+                        <div class="verified-hero mb-4">
+                            <div class="verified-hero-icon">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="verified-hero-copy">
+                                <h4 id="employee-name-modal" class="mb-1">--</h4>
+                                <p id="employee-id-modal" class="text-muted mb-0">--</p>
+                            </div>
+                        </div>
+                        <div class="verified-date-time text-center">
+                            <div id="verified-time-modal" class="verified-time">--:--:--</div>
+                            <div id="verified-date-modal" class="verified-date">--- --, ----</div>
+                        </div>
+                        <div class="alert alert-info text-center mt-4" id="attendance-message-modal">
+                            <i class="fas fa-info-circle"></i> <span>--</span>
+                        </div>
+                    </div>
+                    <div id="result-nomatch-modal" class="d-none mt-2">
+                        <div class="alert alert-danger mb-0 text-center">
+                            <h6 class="mb-1"><i class="fas fa-times-circle"></i> Fingerprint Not Recognized</h6>
+                            <p class="mb-0" id="nomatch-message-modal">Fingerprint not recognized</p>
+                        </div>
+                    </div>
+                    <div id="result-error-modal" class="d-none mt-2">
+                        <div class="alert alert-warning mb-0 text-center">
+                            <h6 class="mb-1"><i class="fas fa-exclamation-triangle"></i> Error</h6>
+                            <p class="mb-0" id="error-message-modal">An error occurred</p>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <small class="text-muted" id="modal-bottom-hint"><i class="fas fa-info-circle"></i> Scanning starts automatically — keep finger on scanner until verification completes</small>
+                    </div>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
         </div>
     </div>
 
     <div id="frame2-wrapper" class="d-none">
         <div class="page-header prototype-header">
-            <h1><i class="fas fa-fingerprint"></i> Employee Fingerprint Attendance</h1>
-            <p>ZK9500 Scanner Interface with Daily Tracking</p>
+            <h1><i class="fas fa-fingerprint"></i> Employee Biometric Attendance</h1>
+            <p>ZK9500 Scanner — Public attendance scanning only. Enrollment is via Registration (Admin).</p>
         </div>
 
         <div class="row">
@@ -85,18 +219,21 @@
                                     </p>
                                 </div>
 
-                                <div class="d-grid gap-2">
-                                    <button id="btn-scan" class="btn btn-primary btn-lg" disabled>
-                                        <i class="fas fa-fingerprint"></i> Start Scanning
+                                <div class="d-grid gap-3">
+                                    <button id="btn-scan" class="btn btn-primary kiosk-scan-btn" disabled style="padding: 22px 36px; font-size: 1.55rem; font-weight: 700; border-radius: 14px; height: 84px; letter-spacing: 0.3px; box-shadow: 0 10px 28px rgba(0,129,2,0.25);">
+                                        <i class="fas fa-fingerprint" style="font-size: 1.7rem; margin-right: 10px;"></i> Start Scanning
+                                        <small style="display:block; font-size:0.75rem; font-weight:500; opacity:0.9; margin-top:4px;">Press Space to scan</small>
                                     </button>
                                     <button id="btn-reset" class="btn btn-outline-secondary">
                                         <i class="fas fa-redo-alt"></i> Reset
                                     </button>
                                 </div>
+                                <small class="text-muted d-block mt-2"><i class="fas fa-keyboard"></i> Kiosk: <kbd>Enter</kbd> = Continue &nbsp;|&nbsp; <kbd>Space</kbd> = Start Scanning</small>
 
                                 <div class="alert alert-info mt-3 text-start prototype-help">
                                     <strong><i class="fas fa-info-circle"></i> How to use:</strong><br>
-                                    Click <strong>Start Scanning</strong> to record attendance using the ZK9500 scanner.
+                                    1. Select employee below and click "Enroll Fingerprint"<br>
+                                    2. Or click "Start Scanning" to record attendance
                                 </div>
                             </div>
                         </div>
@@ -164,7 +301,14 @@
                     </div>
                 </div>
 
-                <!-- Enrollment removed: enrollment is now on a dedicated page -->
+                <!-- Verification-only: employee context for strict check (Enroll is admin-only at /scan/employee/zk9500/enroll) -->
+                <select id="enroll-employee" class="d-none" aria-hidden="true" tabindex="-1">
+                    <option value="">-- Select Employee --</option>
+                    @foreach($employees as $emp)
+                        <option value="{{ $emp->id }}">{{ $emp->name }} ({{ $emp->employee_id_number }})</option>
+                    @endforeach
+                </select>
+                <!-- No enroll button here - strictly verification mode, no fingerprint creation -->
 
             </div>
 
@@ -173,8 +317,11 @@
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <span><i class="fas fa-calendar-alt"></i> Today's Record</span>
                         <div class="d-flex gap-2 align-items-center">
+                            <button id="btn-display-all" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-users"></i> Display All Employees
+                            </button>
                             <button id="btn-view-all-today" class="btn btn-sm btn-outline-secondary">
-                                <i class="fas fa-users"></i> View All Today's Records
+                                <i class="fas fa-list"></i> View All (Modal)
                             </button>
                             <button id="btn-refresh" class="btn btn-sm btn-outline-primary">
                                 <i class="fas fa-sync-alt"></i> Refresh
@@ -182,6 +329,9 @@
                         </div>
                     </div>
                     <div class="card-body">
+                        <div id="today-record-search-wrap" class="mb-3 d-none">
+                            <input id="today-record-search-main" type="search" class="form-control form-control-sm" placeholder="Search employee by name...">
+                        </div>
                         <div id="today-record-container">
                             <div class="text-center text-muted py-4">
                                 <p class="mb-2"><i class="fas fa-calendar-check"></i> <strong id="today-date">-- -- ----</strong></p>
@@ -504,6 +654,60 @@
         font-size: 1rem;
     }
 
+    .kiosk-scan-btn {
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    .kiosk-scan-btn:not(:disabled):hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 36px rgba(0,129,2,0.32);
+    }
+    .kiosk-scan-btn:not(:disabled):active {
+        transform: translateY(0);
+    }
+    .kiosk-scan-btn:focus-visible {
+        outline: 3px solid #008102;
+        outline-offset: 3px;
+    }
+    kbd {
+        background:#e9ecef; border:1px solid #ced4da; border-bottom-width:2px; padding:2px 6px; border-radius:4px; font-size:0.75rem;
+    }
+
+    /* Kiosk fullscreen optimization - fill screen, remove navigation */
+    .public-topbar { display: none !important; }
+    .public-content { padding: 0 !important; background: #f8fff9; }
+    .public-shell { background: #f8fff9; min-height: 100vh; }
+    .prototype-shell { min-height: 100vh; width: 100%; margin: 0; border-radius: 0; }
+    .frame1-screen { min-height: 100vh; padding: 24px; border-radius: 0; }
+    /* True kiosk - hide cursor when fullscreen, no mouse needed */
+    :fullscreen { cursor: none; }
+    :-webkit-full-screen { cursor: none; }
+    :-moz-full-screen { cursor: none; }
+    html:fullscreen body { cursor: none; }
+    /* Also hide cursor after 2s in kiosk even if not fullscreen (optional) */
+    body.kiosk-no-cursor { cursor: none; }
+    body.kiosk-no-cursor * { cursor: none !important; }
+    #kiosk-fullscreen-prompt {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        z-index: 9999;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    }
+    #kiosk-fullscreen-hint {
+        position: fixed;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 9998;
+        background: rgba(0,0,0,0.75);
+        color: #fff;
+        padding: 8px 14px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        display: none;
+    }
+    #kiosk-fullscreen-hint.show { display: block; }
+
     @media (max-width: 992px) {
         .frame1-layout { grid-template-columns: 1fr; }
         .frame1-clock-panel { padding: 24px; text-align: center; }
@@ -534,8 +738,86 @@
     const employeeDirectory = @json($employeeDirectory);
     const attendanceMap = @json($attendanceMap);
 
+    // Kiosk fullscreen helpers (browser-compliant)
+    let kioskHasTriedAutoFullscreen = false;
+    function isKioskFullscreen() { return !!document.fullscreenElement; }
+    function showKioskPrompt() {
+        const btn = document.getElementById('kiosk-fullscreen-prompt');
+        const hint = document.getElementById('kiosk-fullscreen-hint');
+        if (btn) btn.classList.remove('d-none');
+        if (hint) hint.classList.add('show');
+    }
+    function hideKioskPrompt() {
+        const btn = document.getElementById('kiosk-fullscreen-prompt');
+        const hint = document.getElementById('kiosk-fullscreen-hint');
+        if (btn) btn.classList.add('d-none');
+        if (hint) hint.classList.remove('show');
+    }
+    function attemptKioskFullscreen() {
+        if (isKioskFullscreen() || kioskHasTriedAutoFullscreen) return;
+        kioskHasTriedAutoFullscreen = true;
+        const el = document.documentElement;
+        if (el.requestFullscreen) {
+            el.requestFullscreen().then(() => {
+                hideKioskPrompt();
+                document.body.classList.add('kiosk-no-cursor');
+            }).catch(() => {
+                // Browser blocked (requires gesture) — show prompt; user must press F (not Enter/Shift/Space)
+                showKioskPrompt();
+            });
+        } else {
+            showKioskPrompt();
+        }
+    }
+    function toggleKioskFullscreen() {
+        if (isKioskFullscreen()) {
+            if (document.exitFullscreen) {
+                document.exitFullscreen().catch(()=>{});
+            }
+        } else {
+            const el = document.documentElement;
+            if (el.requestFullscreen) {
+                el.requestFullscreen().then(() => {
+                    hideKioskPrompt();
+                    document.body.classList.add('kiosk-no-cursor');
+                }).catch(showKioskPrompt);
+            }
+        }
+    }
+    function setupKioskFullscreen() {
+        const btn = document.getElementById('kiosk-fullscreen-prompt');
+        if (btn) {
+            btn.addEventListener('click', () => {
+                toggleKioskFullscreen();
+            });
+        }
+        // Use dedicated key F for fullscreen — not Enter/Shift/Space, not F11
+        const tryOnF = (e) => {
+            const active = document.activeElement;
+            const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+            // Prevent F11's browser task-view overlay
+            if (e.key === 'F11' || e.code === 'F11') {
+                e.preventDefault();
+                return;
+            }
+            if (isTyping) return;
+            if ((e.key === 'f' || e.key === 'F' || e.code === 'KeyF') && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                e.preventDefault();
+                toggleKioskFullscreen();
+            }
+        };
+        document.addEventListener('keydown', tryOnF);
+        document.addEventListener('fullscreenchange', () => {
+            if (isKioskFullscreen()) { hideKioskPrompt(); document.body.classList.add('kiosk-no-cursor'); }
+            else { showKioskPrompt(); document.body.classList.remove('kiosk-no-cursor'); }
+        });
+        // Initial auto-attempt (may be blocked, then F will enter)
+        setTimeout(attemptKioskFullscreen, 500);
+    }
+
     let activeFingerprintServer = FINGERPRINT_SERVER_PRIMARY;
     let isScanning = false;
+    let modalResultShown = false;
 
     const scannerVisual = document.getElementById('scanner-visual');
     const scanStatus = document.getElementById('scan-status');
@@ -575,6 +857,8 @@
     const resultNoMatch = document.getElementById('result-nomatch');
     const resultError = document.getElementById('result-error');
     let revertTimer = null;
+    let retryTimer = null;
+    let preserveErrorOnRescan = false;
 
     // Today's record tracking (in-memory) - up to 4 time-in/time-out pairs
     const STORAGE_KEY = 'todayRecordStore';
@@ -807,6 +1091,98 @@
         }
     }
 
+    // Main Today's Record — Display All Employees (sorted, searchable, no refresh, no DB change)
+    let isMainDisplayAll = false;
+    function renderMainTodayAll(filter = '') {
+        ensureTodayRecordStoreForToday();
+        const q = String(filter || '').trim().toLowerCase();
+        const rows = employeeDirectory
+            .map(emp => {
+                const rec = todayRecordStore.records[String(emp.id)] || null;
+                return {
+                    id: emp.id,
+                    name: emp.name,
+                    employeeNo: emp.employeeNo || emp.employee_id_number || emp.employeeNo,
+                    record: rec
+                };
+            })
+            .filter(item => !q || item.name.toLowerCase().includes(q))
+            .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+        // Update main card header status
+        const statusEl = document.getElementById('today-record-status');
+        if (statusEl) {
+            if (q) {
+                statusEl.textContent = rows.length ? `Showing ${rows.length} matching employee(s) for "${filter}"` : `No employees match "${filter}"`;
+            }
+        }
+
+        // Render into main table body (today-record-tbody) or show empty
+        const tbody = document.getElementById('today-record-tbody');
+        const container = document.getElementById('today-record-container');
+        const list = document.getElementById('today-record-list');
+        const dateEl = document.getElementById('today-date');
+
+        if (dateEl) {
+            dateEl.textContent = new Date().toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        }
+
+        // Ensure list is visible and container hidden when showing all
+        if (container) container.classList.add('d-none');
+        if (list) list.classList.remove('d-none');
+        // Hide single employee header (name/id) when showing all — show generic
+        const nameEl = document.getElementById('today-record-employee-name');
+        const idEl = document.getElementById('today-record-employee-id');
+        if (nameEl) nameEl.textContent = isMainDisplayAll ? 'All Employees (sorted A–Z)' : (todayRecordData.employeeName || '--');
+        if (idEl) idEl.textContent = isMainDisplayAll ? `${rows.length} employees` : (todayRecordData.employeeCode || '--');
+
+        if (!tbody) return;
+
+        if (rows.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="11" class="text-center text-muted">No employees match your search.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = rows.map(item => {
+            const r = item.record || {};
+            const dateCell = r && r.date ? new Date(r.date).toLocaleDateString([], { year: 'numeric', month: '2-digit', day: '2-digit' }) : new Date().toLocaleDateString([], { year: 'numeric', month: '2-digit', day: '2-digit' });
+            return `
+                <tr>
+                    <td>${dateCell}</td>
+                    <td>${item.employeeNo || '-'}</td>
+                    <td>${item.name}</td>
+                    <td>${r.time_in_1 || '-'}</td>
+                    <td>${r.time_out_1 || '-'}</td>
+                    <td>${r.time_in_2 || '-'}</td>
+                    <td>${r.time_out_2 || '-'}</td>
+                    <td>${r.time_in_3 || '-'}</td>
+                    <td>${r.time_out_3 || '-'}</td>
+                    <td>${r.time_in_4 || '-'}</td>
+                    <td>${r.time_out_4 || '-'}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function toggleMainDisplayAll() {
+        isMainDisplayAll = !isMainDisplayAll;
+        const btn = document.getElementById('btn-display-all');
+        const searchWrap = document.getElementById('today-record-search-wrap');
+        const searchInput = document.getElementById('today-record-search-main');
+        if (isMainDisplayAll) {
+            if (btn) { btn.innerHTML = '<i class="fas fa-user"></i> Show Selected Only'; btn.classList.remove('btn-outline-secondary'); btn.classList.add('btn-secondary'); }
+            if (searchWrap) searchWrap.classList.remove('d-none');
+            if (searchInput) { searchInput.value = ''; searchInput.focus(); }
+            renderMainTodayAll('');
+        } else {
+            if (btn) { btn.innerHTML = '<i class="fas fa-users"></i> Display All Employees'; btn.classList.remove('btn-secondary'); btn.classList.add('btn-outline-secondary'); }
+            if (searchWrap) searchWrap.classList.add('d-none');
+            if (searchInput) searchInput.value = '';
+            // Return to single selected view
+            updateTodayRecordDisplay();
+        }
+    }
+
     const notificationModalEl = document.getElementById('prototypeNotificationModal');
     const notificationModal = notificationModalEl ? new bootstrap.Modal(notificationModalEl) : null;
     const notificationTitle = document.getElementById('prototypeNotificationTitle');
@@ -847,25 +1223,43 @@
             const response = await fetchFingerprint('/health');
             const data = await response.json();
 
-                    if (data?.status === 'ok' && (data?.scanner?.connected || data?.scanner?.busy)) {
-                        scannerStatus.className = 'badge bg-success';
-                        scannerStatus.innerHTML = '<i class="fas fa-check-circle"></i> Connected';
-                        btnScan.disabled = false;
-                        if (btnEnroll) btnEnroll.disabled = false;
-                        updateStatus('ready', 'Ready to Scan', 'Place your finger on the scanner and click "Start Scanning"');
-                    } else {
-                        scannerStatus.className = 'badge bg-danger';
-                        scannerStatus.innerHTML = '<i class="fas fa-times-circle"></i> Scanner not connected';
-                        btnScan.disabled = true;
-                        if (btnEnroll) btnEnroll.disabled = true;
-                        updateStatus('error', 'Not Connected', 'Cannot connect to fingerprint server');
-                    }
+            // Do not clobber the visible scanner status while the scanner modal is open
+            // (scanning) or a result (matched/nomatch/error) is being shown. Only update
+            // the status text when we are in the idle Frame2 page.
+            const scModalEl = document.getElementById('scannerModal');
+            const modalOpen = scModalEl && scModalEl.classList.contains('show');
+
+            if (data?.status === 'ok' && (data?.scanner?.connected || data?.scanner?.busy)) {
+                scannerStatus.className = 'badge bg-success';
+                scannerStatus.innerHTML = '<i class="fas fa-check-circle"></i> Connected';
+                btnScan.disabled = false;
+                if (btnEnroll) btnEnroll.disabled = false;
+                if (!modalOpen) updateStatus('ready', 'Ready to Scan', 'Place your finger on the scanner and press Space');
+                // Ensure Start Scanning is focused for kiosk Space key
+                if (frame2Wrapper && !frame2Wrapper.classList.contains('d-none')) {
+                    setTimeout(() => { if (!isScanning) btnScan.focus(); }, 100);
+                }
+            } else {
+                scannerStatus.className = 'badge bg-danger';
+                scannerStatus.innerHTML = '<i class="fas fa-times-circle"></i> Scanner not connected';
+                btnScan.disabled = false; // keep enabled so Space is detectable and button is focusable (kiosk)
+                if (btnEnroll) btnEnroll.disabled = true;
+                if (!modalOpen) updateStatus('error', 'Not Connected', 'Cannot connect to fingerprint server - Press Space to try');
+                if (frame2Wrapper && !frame2Wrapper.classList.contains('d-none')) {
+                    setTimeout(() => { if (!isScanning) btnScan.focus(); }, 100);
+                }
+            }
         } catch (error) {
             scannerStatus.className = 'badge bg-danger';
             scannerStatus.innerHTML = '<i class="fas fa-times-circle"></i> Disconnected';
-            btnScan.disabled = true;
+            btnScan.disabled = false; // keep enabled for kiosk
             if (btnEnroll) btnEnroll.disabled = true;
-            updateStatus('error', 'Not Connected', 'Cannot connect to fingerprint server');
+            const smEl = document.getElementById('scannerModal');
+            const modalOpenNow = smEl && smEl.classList.contains('show');
+            if (!modalOpenNow) updateStatus('error', 'Not Connected', 'Cannot connect to fingerprint server - Press Space to try');
+            if (frame2Wrapper && !frame2Wrapper.classList.contains('d-none')) {
+                setTimeout(() => { if (!isScanning) btnScan.focus(); }, 100);
+            }
         }
     }
 
@@ -907,16 +1301,26 @@
         document.getElementById('frame1-current-date').textContent = now.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     }
 
-    function updateStatus(type, title, message) {
-        scanStatus.className = `status-box status-${type === 'ready' ? 'waiting' : type}`;
-        statusTitle.textContent = title;
+    function updateStatus(type, title, message, includeModal = true) {
         const icons = {
             ready: 'fa-hand-point-up',
             scanning: 'fa-circle-notch fa-spin',
             success: 'fa-check-circle',
             error: 'fa-exclamation-circle'
         };
-        statusMessage.innerHTML = `<i class="fas ${icons[type] || 'fa-info-circle'}"></i> ${message}`;
+        const html = `<i class="fas ${icons[type] || 'fa-info-circle'}"></i> ${message}`;
+        // Update Frame2 (legacy hidden) and Modal (visible)
+        scanStatus.className = `status-box status-${type === 'ready' ? 'waiting' : type}`;
+        statusTitle.textContent = title;
+        statusMessage.innerHTML = html;
+        if (includeModal) {
+            const mBox = document.getElementById('scan-status-modal');
+            const mTitle = document.getElementById('status-title-modal');
+            const mMsg = document.getElementById('status-message-modal');
+            if (mBox) mBox.className = `status-box status-${type === 'ready' ? 'waiting' : type}`;
+            if (mTitle) mTitle.textContent = title;
+            if (mMsg) mMsg.innerHTML = html;
+        }
     }
 
     function setScanning(scanning) {
@@ -924,18 +1328,57 @@
         btnScan.disabled = scanning;
         if (btnEnroll) btnEnroll.disabled = scanning;
         btnScan.innerHTML = scanning ? '<i class="fas fa-circle-notch fa-spin"></i> Scanning...' : '<i class="fas fa-fingerprint"></i> Start Scanning';
+        // Also update modal visual
+        const mv = document.getElementById('scanner-visual-modal');
+        if (mv) mv.className = scanning ? 'scanner-container scanning' : 'scanner-container';
     }
 
-    function showResult(type) {
-        [resultWaiting, resultMatched, resultNoMatch, resultError].forEach(el => el.classList.add('d-none'));
+    function showResult(type, options = {}) {
+        const preserveErrors = !!options.preserveErrors;
+        [resultWaiting, resultMatched, resultNoMatch, resultError].forEach(el => el && el.classList.add('d-none'));
         const panels = { waiting: resultWaiting, matched: resultMatched, nomatch: resultNoMatch, error: resultError };
         if (panels[type]) panels[type].classList.remove('d-none');
+        // Also update modal result panels
+        const rmM = document.getElementById('result-matched-modal');
+        const rnM = document.getElementById('result-nomatch-modal');
+        const reM = document.getElementById('result-error-modal');
+        [rmM].forEach(el => el && el.classList.add('d-none'));
+        // When preserving errors (auto-rescan after a failure), keep the error panels visible
+        // so the previous failure is not removed until the next attempt actually returns a result.
+        if (!preserveErrors) {
+            [rnM, reM].forEach(el => el && el.classList.add('d-none'));
+        }
+        const panelsM = { matched: rmM, nomatch: rnM, error: reM };
+        if (panelsM[type]) panelsM[type].classList.remove('d-none');
+        // The "Ready to Scan" / scanning UI (scanner visual + status box) stays visible while
+        // waiting, and also on a failed scan (nomatch/error) so the error appears at the BOTTOM
+        // of the same modal while the scanner remains live. Only a successful match swaps in the
+        // verified panel and hides the scan UI.
+        const scVisModal = document.getElementById('scanner-visual-modal');
+        const scStatusModal = document.getElementById('scan-status-modal');
+        const scVis = document.getElementById('scanner-visual');
+        const scStatus = document.getElementById('scan-status');
+        const showScanUI = (type !== 'matched');
+        if (scVisModal) scVisModal.classList.toggle('d-none', !showScanUI);
+        if (scStatusModal) scStatusModal.classList.toggle('d-none', !showScanUI);
+        if (scVis) scVis.classList.toggle('d-none', !showScanUI);
+        if (scStatus) scStatus.classList.toggle('d-none', !showScanUI);
     }
 
     function showReadyState() {
+        cancelAutoRescan();
         showResult('waiting');
         scannerVisual.className = 'scanner-container';
         updateStatus('ready', 'Ready to Scan', 'Place your finger on the scanner and click "Start Scanning"');
+        // Also reset modal visual/status to ready
+        const mv = document.getElementById('scanner-visual-modal');
+        const mBox = document.getElementById('scan-status-modal');
+        const mTitle = document.getElementById('status-title-modal');
+        const mMsg = document.getElementById('status-message-modal');
+        if (mv) mv.className = 'scanner-container';
+        if (mBox) mBox.className = 'status-box status-waiting';
+        if (mTitle) mTitle.textContent = 'Ready to Scan';
+        if (mMsg) mMsg.innerHTML = '<i class="fas fa-hand-point-up"></i> Place your finger on the scanner — scanning will start automatically';
     }
 
     function resetScan() {
@@ -948,6 +1391,69 @@
         frame2Wrapper.classList.remove('d-none');
     }
 
+    function showFrame1() {
+        // Hide scanner modal if open (modal type, not page)
+        const scModalEl = document.getElementById('scannerModal');
+        if (scModalEl) {
+            const inst = bootstrap.Modal.getInstance(scModalEl);
+            if (inst) inst.hide();
+        }
+        frame2Wrapper.classList.add('d-none');
+        frame1Screen.style.display = 'flex';
+        employeeNoInput.value = '';
+        employeeNoHint.textContent = 'Press Enter to continue.';
+        employeeNoHint.classList.remove('text-danger');
+        setScanning(false);
+        modalResultShown = false;
+        showReadyState();
+        // Ensure Today's Record collapsible in Frame1 is visible and updated
+        const coll = document.getElementById('frame1-today-collapse');
+        if (coll && !coll.classList.contains('show')) {
+            new bootstrap.Collapse(coll, { toggle: false }).show();
+        }
+        // Focus input for next employee (kiosk continuous) and clear for next
+        setTimeout(() => employeeNoInput.focus(), 150);
+    }
+
+    function autoReturnToSearch(delayMs = 4000) {
+        if (revertTimer) {
+            clearTimeout(revertTimer);
+            revertTimer = null;
+        }
+        revertTimer = setTimeout(() => {
+            if (notificationModalEl && notificationModalEl.classList.contains('show') && notificationModal) {
+                notificationModal.hide();
+                // Wait for modal hide animation before switching frames
+                setTimeout(showFrame1, 300);
+            } else {
+                showFrame1();
+            }
+        }, delayMs);
+    }
+
+    function cancelAutoRescan() {
+        if (retryTimer) {
+            clearTimeout(retryTimer);
+            retryTimer = null;
+        }
+    }
+
+    // After a failed scan, the kiosk stays on the scanning modal and automatically starts
+    // a new scan after a short delay so the user can rescan immediately.
+    function scheduleAutoRescan(delayMs = 1200) {
+        cancelAutoRescan();
+        retryTimer = setTimeout(() => {
+            retryTimer = null;
+            const scModalEl = document.getElementById('scannerModal');
+            const stillOpen = scModalEl && scModalEl.classList.contains('show');
+            if (stillOpen && !isScanning) {
+                modalResultShown = false;
+                preserveErrorOnRescan = true;
+                startScan();
+            }
+        }, delayMs);
+    }
+
     function proceedFromEmployeeNoInput() {
         const employee = findEmployeeByNumber(employeeNoInput.value);
         if (!employee) {
@@ -956,13 +1462,58 @@
             return;
         }
 
-        employeeNoHint.textContent = `Employee found: ${employee.name}. Proceeding to scan frame...`;
+        employeeNoHint.textContent = `Employee found: ${employee.name}. Opening scanner...`;
         employeeNoHint.classList.remove('text-danger');
-        if (enrollEmployee) enrollEmployee.value = String(employee.id);
+        enrollEmployee.value = String(employee.id);
         setActiveTodayRecord(employee.id, employee.name, employee.employeeNo);
         updateTodayRecordDisplay();
-        showFrame2();
-        btnScan.focus();
+        // Show modal instead of going to other page (Frame2) - contains image, auto-ready without Space
+        const modalEl = document.getElementById('scannerModal');
+        const modalNameEl = document.getElementById('modal-employee-name');
+        const modalIdEl = document.getElementById('modal-employee-id');
+        if (modalNameEl) modalNameEl.textContent = employee.name;
+        if (modalIdEl) modalIdEl.textContent = employee.employeeNo;
+        // Also set modal's employee header for verification display
+        const modalEmpName = document.getElementById('employee-name-modal');
+        const modalEmpId = document.getElementById('employee-id-modal');
+        if (modalEmpName) modalEmpName.textContent = employee.name;
+        if (modalEmpId) modalEmpId.textContent = employee.employeeNo;
+        if (modalEl) {
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+            // Auto-start scanning when modal is shown - no Space needed, ready until finger placed
+            const onShown = function() {
+                modalEl.removeEventListener('shown.bs.modal', onShown);
+                modalResultShown = false;
+                cancelAutoRescan();
+                // Reset modal scanner visual to scanning state (and re-show it if hidden from prior success)
+                const mv = document.getElementById('scanner-visual-modal');
+                const st = document.getElementById('status-title-modal');
+                const sm = document.getElementById('status-message-modal');
+                const mBox = document.getElementById('scan-status-modal');
+                if (mv) { mv.classList.remove('d-none'); mv.className = 'scanner-container scanning'; }
+                if (mBox) mBox.classList.remove('d-none');
+                if (st) st.textContent = 'Scanning...';
+                if (sm) sm.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Place your finger on the scanner — scanning will start automatically';
+                const mHint = document.getElementById('modal-bottom-hint');
+                if (mHint) mHint.innerHTML = '<i class="fas fa-info-circle"></i> Scanning starts automatically — keep finger on scanner until verification completes';
+                // Show waiting state in modal
+                const rm = document.getElementById('result-matched-modal');
+                const rn = document.getElementById('result-nomatch-modal');
+                const re = document.getElementById('result-error-modal');
+                if (rm) rm.classList.add('d-none');
+                if (rn) rn.classList.add('d-none');
+                if (re) re.classList.add('d-none');
+                setTimeout(() => {
+                    startScan();
+                }, 400);
+            };
+            modalEl.addEventListener('shown.bs.modal', onShown, { once: true });
+        } else {
+            // Fallback to old Frame2 if modal not found
+            showFrame2();
+            if (btnScan) btnScan.focus();
+        }
     }
 
     function updateTodayRecordDisplay() {
@@ -971,6 +1522,14 @@
             currentTodayEmployeeId = null;
             todayRecordData = getEmptyTodayRecord();
             saveTodayRecordStoreToStorage(todayRecordStore);
+        }
+
+        // If Display All is active, render all sorted and respect search filter
+        if (typeof isMainDisplayAll !== 'undefined' && isMainDisplayAll) {
+            const searchInput = document.getElementById('today-record-search-main');
+            const filter = searchInput ? searchInput.value : '';
+            renderMainTodayAll(filter);
+            return;
         }
 
         // Update the date header
@@ -1112,21 +1671,26 @@
     }
 
     async function startScan() {
+        // Only one scan at a time: ignore re-entry while a scan is already in progress.
+        if (isScanning) return;
+        cancelAutoRescan();
+        modalResultShown = false;
+        // If this scan was auto-started after a failed attempt, keep the previous error
+        // visible until this new attempt returns a result (do not wipe it on rescan).
+        const preserveErrors = preserveErrorOnRescan;
+        preserveErrorOnRescan = false;
         try {
             setScanning(true);
-            showResult('waiting');
+            showResult('waiting', { preserveErrors });
             scannerVisual.className = 'scanner-container scanning';
             updateStatus('scanning', 'Scanning...', 'Place your finger on the scanner');
 
-            const selectedEmployeeId = currentTodayEmployeeId
-                ? parseInt(currentTodayEmployeeId)
-                : ((enrollEmployee && enrollEmployee.value) ? parseInt(enrollEmployee.value) : null);
             const response = await fetchFingerprint('/api/verify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     allowAttendance: true,
-                    employeeId: selectedEmployeeId,
+                    employeeId: enrollEmployee.value ? parseInt(enrollEmployee.value) : null,
                     preferSelectedEmployee: true,
                 })
             });
@@ -1139,76 +1703,98 @@
             handleVerifyResult(data);
         } catch (error) {
             console.error('Scan error:', error);
-            handleError(error.message);
+            const message = (error && error.message && error.message.toLowerCase().includes('failed to fetch'))
+                ? 'fingerprint mismatched'
+                : error.message;
+            handleError(message);
         }
     }
 
-    async function enrollFingerprint() {
-        const employeeId = enrollEmployee ? enrollEmployee.value : null;
-        if (!employeeId) {
-            showNotification({ title: 'Select Employee', message: 'Please select an employee first.', type: 'warning' });
-            return;
-        }
-
-        try {
-            setScanning(true);
-            scannerVisual.className = 'scanner-container scanning';
-            updateStatus('scanning', 'Enrolling...', 'Place your finger on the scanner');
-
-            const response = await fetchFingerprint('/api/enroll', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ employeeId: parseInt(employeeId) })
-            });
-
-            const data = await response.json();
-            handleEnrollResult(data);
-        } catch (error) {
-            console.error('Enroll error:', error);
-            handleError(error.message);
-        }
-    }
-
+    // Verification-only: no enrollment in kiosk (enrollment via admin Registration Management → Enroll)
     function handleVerifyResult(data) {
         setScanning(false);
+        // Schedule validation: reject if no schedule today (dynamic date, not hardcoded)
+        if (data.schedule_valid === false || data.attendance?.action === 'no_schedule' || (data.matched && data.success === false && data.message && data.message.toLowerCase().includes('no schedule'))) {
+            scannerVisual.className = 'scanner-container error';
+            updateStatus('error', 'No Schedule Today', data.message || 'No schedule for today — attendance not allowed.', false);
+            const errEl = document.getElementById('error-message');
+            if (errEl) errEl.textContent = data.message || 'No schedule for today.';
+            const errMsgModal = document.getElementById('error-message-modal');
+            if (errMsgModal) errMsgModal.textContent = data.message || 'No schedule for today.';
+            showResult('error');
+            modalResultShown = true;
+            scheduleAutoRescan();
+            return;
+        }
+        // Strict verification: fingerprint must belong to selected employee
+        if (data.success === false && data.matched === false && data.message && data.message.toLowerCase().includes('does not belong')) {
+            scannerVisual.className = 'scanner-container error';
+            updateStatus('error', 'Verification Failed', data.message, false);
+            const errEl2 = document.getElementById('error-message');
+            if (errEl2) errEl2.textContent = data.message;
+            const errMsgModal2 = document.getElementById('error-message-modal');
+            if (errMsgModal2) errMsgModal2.textContent = data.message;
+            showResult('error');
+            modalResultShown = true;
+            scheduleAutoRescan();
+            return;
+        }
         if (data.matched) {
             if (revertTimer) {
                 clearTimeout(revertTimer);
                 revertTimer = null;
             }
+            cancelAutoRescan();
 
+            // Update BOTH hidden Frame2 and visible Modal (modal is what you see)
+            const empName = data.employee.employee_name || data.employee.name;
+            const empCode = data.employee.employee_code || data.employee.employee_id;
+            const matchText = data.matchScore ? `Identity Match: ${Math.min(data.matchScore,100)}%` : 'Identity Match: 100%';
+            const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const dateNow = new Date().toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            const attendanceMsg = data.attendance?.message || data.message || 'Attendance recorded';
+
+            // Legacy Frame2 (hidden, kept for fallback)
             scannerVisual.className = 'scanner-container success';
-            updateStatus('success', 'Verified!', `Welcome, ${data.employee.employee_name || data.employee.name}!`);
-
-            document.getElementById('employee-name').textContent = data.employee.employee_name || data.employee.name;
-            document.getElementById('employee-id').textContent = data.employee.employee_code || data.employee.employee_id;
-            document.getElementById('attendance-message').querySelector('span').textContent = data.attendance?.message || data.message || 'Attendance recorded';
+            updateStatus('success', 'Verified!', `Welcome, ${empName}!`);
+            document.getElementById('employee-name').textContent = empName;
+            document.getElementById('employee-id').textContent = empCode;
+            document.getElementById('attendance-message').querySelector('span').textContent = attendanceMsg;
             document.getElementById('match-score').textContent = data.matchScore ? `Match score: ${data.matchScore}%` : 'Match score: 100%';
-            if (verifiedTime) {
-                verifiedTime.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            }
-            if (verifiedDate) {
-                verifiedDate.textContent = new Date().toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            }
+            if (verifiedTime) verifiedTime.textContent = timeNow;
+            if (verifiedDate) verifiedDate.textContent = dateNow;
 
-            showNotification({
-                title: data.attendance?.action === 'time_out' ? 'Time Out Recorded' : 'Time In Recorded',
-                message: data.attendance?.message || data.message || 'Attendance recorded successfully.',
-                type: 'success',
-            });
+            // Visible Modal (what you see in Image 1)
+            const mv = document.getElementById('scanner-visual-modal');
+            if (mv) mv.className = 'scanner-container success';
+            const mName = document.getElementById('employee-name-modal');
+            const mId = document.getElementById('employee-id-modal');
+            const mScore = document.getElementById('match-score-modal');
+            const mAtt = document.getElementById('attendance-message-modal');
+            const mTime = document.getElementById('verified-time-modal');
+            const mDate = document.getElementById('verified-date-modal');
+            if (mName) mName.textContent = empName;
+            if (mId) mId.textContent = empCode;
+            if (mScore) mScore.textContent = matchText;
+            if (mTime) mTime.textContent = timeNow;
+            if (mDate) mDate.textContent = dateNow;
+            if (mAtt) mAtt.querySelector('span').textContent = attendanceMsg;
+
+            // Show only the verified result panel in the modal; hide scanner visual/status for clean display
+            const scVisModal = document.getElementById('scanner-visual-modal');
+            const scStatusModal = document.getElementById('scan-status-modal');
+            if (scVisModal) scVisModal.classList.add('d-none');
+            if (scStatusModal) scStatusModal.classList.add('d-none');
+            const bottomHint = document.getElementById('modal-bottom-hint');
+            if (bottomHint) bottomHint.innerHTML = '<i class="fas fa-keyboard"></i> Press <kbd>Enter</kbd> to close and return';
+
+            // Do NOT show covering Time In Recorded popup on success - keep Identity Verified visible inside modal
+            // (was showNotification({title:'Time In Recorded'}) which covered the modal in your screenshot)
 
             // Log the scan event to today's record
-            const scannedEmployeeId = data.employee.id
-                || data.employee.employee_id
-                || currentTodayEmployeeId
-                || (enrollEmployee ? enrollEmployee.value : null);
-            const scannedEmployeeName = data.employee.employee_name
-                || data.employee.name
-                || '--';
-            const scannedEmployeeCode = data.employee.employee_code
-                || data.employee.employee_id
-                || data.employee.employeeNo
-                || '--';
+            const scannedEmployeeId = data.employee.id || enrollEmployee.value;
+            const scannedEmployeeName = data.employee.employee_name || data.employee.name;
+            const scannedEmployeeCode = data.employee.employee_code || data.employee.employee_id;
             
             // Verify we have valid scanned employee data
             if (!scannedEmployeeId || !scannedEmployeeName || !scannedEmployeeCode) {
@@ -1230,17 +1816,18 @@
             );
 
             showResult('matched');
-            revertTimer = setTimeout(() => {
-                showReadyState();
-            }, 10000);
+            modalResultShown = true;
+            // Continuous kiosk: automatically return to Search Employee No. after showing result
+            autoReturnToSearch(4000);
         } else {
             scannerVisual.className = 'scanner-container error';
-            updateStatus('error', 'Not Found', data.message || 'Fingerprint not recognized');
-            showNotification({ title: 'Fingerprint Not Recognized', message: data.message || 'Fingerprint not recognized.', type: 'warning' });
+            updateStatus('error', 'Not Found', data.message || 'Fingerprint not recognized', false);
+            const nomatchMsg = document.getElementById('nomatch-message-modal');
+            if (nomatchMsg) nomatchMsg.textContent = data.message || 'Fingerprint not recognized.';
             
             // Log the failed scan event
-            const empId = enrollEmployee ? parseInt(enrollEmployee.value) : null;
-            const empRecord = empId ? employeeDirectory.find(e => String(e.id) === String(empId)) : null;
+            const empId = parseInt(enrollEmployee.value);
+            const empRecord = employeeDirectory.find(e => String(e.id) === String(empId));
             if (empId && empRecord) {
                 logScanEvent(
                     empId,
@@ -1252,46 +1839,26 @@
             }
             
             showResult('nomatch');
+            modalResultShown = true;
+            scheduleAutoRescan();
         }
     }
 
-    function handleEnrollResult(data) {
-        setScanning(false);
-        if (data.success) {
-            scannerVisual.className = 'scanner-container success';
-            updateStatus('success', 'Enrolled!', data.message);
-            showNotification({ title: 'Fingerprint Enrolled', message: data.message || 'Fingerprint enrolled successfully.', type: 'success' });
-            
-            // Log the enrollment event
-            const empId = enrollEmployee ? parseInt(enrollEmployee.value) : null;
-            const empRecord = empId ? employeeDirectory.find(e => String(e.id) === String(empId)) : null;
-            if (empId && empRecord) {
-                logScanEvent(
-                    empId,
-                    empRecord.name,
-                    empRecord.employeeNo,
-                    'Fingerprint Enrollment',
-                    'success'
-                );
-            }
-        } else {
-            scannerVisual.className = 'scanner-container error';
-            updateStatus('error', 'Failed', data.message);
-            showNotification({ title: 'Enrollment Failed', message: data.message || 'Unable to enroll fingerprint.', type: 'danger' });
-        }
-    }
-
+    // handleEnrollResult removed - kiosk is strictly verification mode; enrollment is admin-only at /scan/employee/zk9500/enroll
     function handleError(message) {
         setScanning(false);
         scannerVisual.className = 'scanner-container error';
-        updateStatus('error', 'Error', message);
+        updateStatus('error', 'Error', message, false);
         document.getElementById('error-message').textContent = message;
-        showNotification({ title: 'Error', message: message || 'An error occurred.', type: 'danger' });
+        const errMsgModal = document.getElementById('error-message-modal');
+        if (errMsgModal) errMsgModal.textContent = message;
         showResult('error');
+        modalResultShown = true;
+        scheduleAutoRescan();
     }
 
     btnScan.addEventListener('click', startScan);
-    if (btnEnroll) btnEnroll.addEventListener('click', enrollFingerprint);
+    // enrollFingerprint removed - kiosk verification-only
     btnReset.addEventListener('click', resetScan);
     btnRefresh.addEventListener('click', refreshTodayRecord);
     if (btnViewAllToday) btnViewAllToday.addEventListener('click', openTodayRecordsModal);
@@ -1311,7 +1878,7 @@
     });
 
     // Load the selected employee's record instead of clearing other employees' data
-    if (enrollEmployee) enrollEmployee.addEventListener('change', function() {
+    enrollEmployee.addEventListener('change', function() {
         const selectedEmployeeId = parseInt(this.value);
         const selectedEmployee = employeeDirectory.find(emp => String(emp.id) === String(selectedEmployeeId));
 
@@ -1325,11 +1892,78 @@
         setActiveTodayRecord(selectedEmployee.id, selectedEmployee.name, selectedEmployee.employeeNo);
     });
 
+    // Kiosk keyboard controls: Enter = Continue / Confirm, Space = Start Scanning (no mouse needed) — F is for fullscreen (not Enter/Shift/Space)
+    function isScanErrorVisible() {
+        const reM = document.getElementById('result-error-modal');
+        const rnM = document.getElementById('result-nomatch-modal');
+        return (reM && !reM.classList.contains('d-none')) || (rnM && !rnM.classList.contains('d-none'));
+    }
+
+    function setupKioskKeyboardControls() {
+        document.addEventListener('keydown', function(e) {
+            const active = document.activeElement;
+            const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+            if (e.key === 'Enter') {
+                const scModalEl = document.getElementById('scannerModal');
+                if (scModalEl && scModalEl.classList.contains('show')) {
+                    // Scanner modal is open: Enter closes it (if a result/error is shown) or is ignored while scanning
+                    e.preventDefault();
+                    if (modalResultShown || isScanErrorVisible()) {
+                        if (revertTimer) { clearTimeout(revertTimer); revertTimer = null; }
+                        modalResultShown = false;
+                        showFrame1();
+                    }
+                    return;
+                }
+                if (notificationModalEl && notificationModalEl.classList.contains('show')) {
+                    const okBtn = document.getElementById('notification-ok-btn');
+                    if (okBtn) { e.preventDefault(); okBtn.click(); }
+                    return;
+                }
+                const frame1Visible = frame1Screen && getComputedStyle(frame1Screen).display !== 'none' && !frame1Screen.classList.contains('d-none');
+                if (frame1Visible) {
+                    if (active === employeeNoInput || !isTyping) {
+                        e.preventDefault();
+                        proceedFromEmployeeNoInput();
+                    }
+                    return;
+                }
+            }
+            if (e.key === ' ' || e.code === 'Space') {
+                if (isTyping) return;
+                const frame2Visible = frame2Wrapper && !frame2Wrapper.classList.contains('d-none') && getComputedStyle(frame2Wrapper).display !== 'none';
+                if (frame2Visible && btnScan && !btnScan.disabled && !isScanning) {
+                    e.preventDefault();
+                    btnScan.focus();
+                    startScan();
+                }
+            }
+        });
+        // Enforce kiosk: no right-click menu, no mouse needed
+        document.addEventListener('contextmenu', e => e.preventDefault());
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
+        setupKioskKeyboardControls();
+        setupKioskFullscreen();
         updateClock();
         setInterval(updateClock, 1000);
         pollServerHealth();
         setInterval(pollServerHealth, 3000);
+
+        // Wire Display All Employees and live search (no refresh, no DB change)
+        const btnDisplayAllInit = document.getElementById('btn-display-all');
+        const searchMainInit = document.getElementById('today-record-search-main');
+        if (btnDisplayAllInit) {
+            btnDisplayAllInit.addEventListener('click', toggleMainDisplayAll);
+        }
+        if (searchMainInit) {
+            searchMainInit.addEventListener('input', function() {
+                if (isMainDisplayAll) {
+                    renderMainTodayAll(this.value);
+                }
+            });
+        }
 
         if (preselectEmployeeId) {
             const employee = findEmployeeByNumber(preselectEmployeeId) || employeeDirectory.find(emp => String(emp.id) === String(preselectEmployeeId));

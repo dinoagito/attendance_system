@@ -1182,6 +1182,24 @@
 
     function handleVerifyResult(data) {
         setScanning(false);
+        if (data.schedule_valid === false || data.attendance?.action === 'no_schedule' || (data.matched && data.success === false && data.message && data.message.toLowerCase().includes('no schedule'))) {
+            scannerVisual.className = 'scanner-container error';
+            updateStatus('error', 'No Schedule Today', data.message || 'No schedule for today — attendance not allowed.');
+            const errEl = document.getElementById('error-message');
+            if (errEl) errEl.textContent = data.message || 'No schedule for today.';
+            showNotification({ title: 'No Schedule Today', message: data.message || 'No schedule for today — attendance not allowed.', type: 'warning' });
+            showResult('error');
+            return;
+        }
+        if (data.success === false && data.matched === false && data.message && data.message.toLowerCase().includes('does not belong')) {
+            scannerVisual.className = 'scanner-container error';
+            updateStatus('error', 'Verification Failed', data.message);
+            const errEl2 = document.getElementById('error-message');
+            if (errEl2) errEl2.textContent = data.message;
+            showNotification({ title: 'Verification Failed', message: data.message, type: 'danger' });
+            showResult('error');
+            return;
+        }
         if (data.matched) {
             if (revertTimer) {
                 clearTimeout(revertTimer);

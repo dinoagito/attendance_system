@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
-use App\Models\Student;
 use App\Models\Employee;
 use App\Models\Visitor;
 use App\Models\Schedule;
@@ -47,7 +46,7 @@ class UserController extends Controller
      */
     private function buildEmployeeQuery(Request $request)
     {
-        $query = Employee::query();
+        $query = Employee::query()->withCount('fingerprints');
 
         if ($request->filled('employee_status') && in_array($request->employee_status, ['active', 'inactive'])) {
             $query->where('status', $request->employee_status);
@@ -99,7 +98,7 @@ class UserController extends Controller
     }
 
     /**
-     * Resolve the day list from a stored schedule template.
+     * Resolve the day list from a stored schedule template (Employee/Faculty only).
      */
     private function resolveScheduleDays(Schedule $scheduleTemplate): array
     {
@@ -110,10 +109,7 @@ class UserController extends Controller
         $relatedSchedules = Schedule::query()
             ->where('start_time', $scheduleTemplate->start_time)
             ->where('end_time', $scheduleTemplate->end_time)
-            ->where(function ($query) use ($scheduleTemplate) {
-                $query->where('employee_id', $scheduleTemplate->employee_id)
-                    ->orWhere('student_id', $scheduleTemplate->student_id);
-            })
+            ->where('employee_id', $scheduleTemplate->employee_id)
             ->get();
 
         if ($relatedSchedules->isNotEmpty()) {
@@ -124,12 +120,10 @@ class UserController extends Controller
     }
 
     /**
-     * Display all users with tabs for students, employees, and visitors
+     * Display all users with tabs for employees/faculty and visitors (Student removed)
      */
     public function index(Request $request)
     {
-        $students = Student::paginate(15);
-
         $showAllEmployees = $request->boolean('show_all_employees');
         $newEmployeeId = $request->integer('new_employee_id');
 
@@ -137,7 +131,7 @@ class UserController extends Controller
         $shouldShowEmployeeList = $showAllEmployees || $hasEmployeeFilters || $newEmployeeId;
 
         if ($newEmployeeId) {
-            $newEmployeeQuery = Employee::where('id', $newEmployeeId)
+            $newEmployeeQuery = Employee::where('id', $newEmployeeId)->withCount('fingerprints')
                 ->orderBy('last_name')
                 ->orderBy('first_name');
 
@@ -158,14 +152,13 @@ class UserController extends Controller
         $visitors = Visitor::with('employee')->orderBy('date', 'desc')->paginate(15);
         $visitorEmployees = Employee::orderBy('first_name')->orderBy('last_name')->get();
         
-        // Get schedule templates grouped by logical schedule group
-        $rawSchedules = Schedule::with(['employee', 'student'])
-            ->select('id', 'employee_id', 'student_id', 'user_type', 'day_of_week', 'schedule_days', 'schedule_group_key', 'start_time', 'end_time')
+        // Get schedule templates grouped by logical schedule group for Employees/Faculty
+        $rawSchedules = Schedule::with('employee')
+            ->select('id', 'employee_id', 'user_type', 'day_of_week', 'schedule_days', 'schedule_group_key', 'start_time', 'end_time')
             ->orderBy('employee_id')
-            ->orderBy('student_id')
             ->get();
         
-        // Group schedules by logical schedule group, falling back to legacy grouping
+        // Group schedules by logical schedule group
         $scheduleTemplates = $rawSchedules->groupBy(function($schedule) {
             if ($schedule->schedule_group_key) {
                 return $schedule->schedule_group_key;
@@ -173,7 +166,7 @@ class UserController extends Controller
 
             $personKey = $schedule->employee_id
                 ? 'employee_' . $schedule->employee_id
-                : ($schedule->student_id ? 'student_' . $schedule->student_id : 'template_' . $schedule->start_time . '_' . $schedule->end_time);
+                : 'template_' . $schedule->start_time . '_' . $schedule->end_time;
 
             return $personKey . '_' . $schedule->start_time . '_' . $schedule->end_time;
         })->map(function($group) {
@@ -191,13 +184,11 @@ class UserController extends Controller
                 'start_time' => $first->start_time,
                 'end_time' => $first->end_time,
                 'employee' => $first->employee,
-                'student' => $first->student,
-                'user_type' => $first->user_type,
+                'user_type' => $first->user_type ?? 'employee',
             ];
         })->values();
 
         return view('users.index', [
-            'students' => $students,
             'employees' => $employees,
             'visitors' => $visitors,
             'visitorEmployees' => $visitorEmployees,
@@ -230,58 +221,13 @@ class UserController extends Controller
     }
 
     /**
-     * Store a new student, employee, or visitor
+     * Store a new employee/faculty or visitor (Student removed)
      */
     public function store(Request $request)
     {
         $type = $request->input('user_type');
 
-        if ($type === 'student') {
-            $validated = $request->validate([
-                'student_id_number' => 'required|unique:students|string',
-                'first_name' => 'required|string',
-                'last_name' => 'required|string',
-                'course' => 'nullable|string',
-                'section' => 'nullable|string',
-                'rfid_uid' => 'nullable|unique:students|string',
-                'schedule_id' => 'nullable|exists:employee_schedules,id',
-            ]);
-
-            $student = Student::create($validated);
-
-            // If a schedule template is selected, clone the grouped schedule to the new student
-            if ($request->filled('schedule_id')) {
-                $scheduleTemplate = Schedule::find($request->input('schedule_id'));
-                if ($scheduleTemplate) {
-                    $days = $this->resolveScheduleDays($scheduleTemplate);
-
-                    if ($days) {
-                        $groupKey = Schedule::buildGroupKey(
-                            'student',
-                            null,
-                            $student->id,
-                            $days,
-                            $scheduleTemplate->start_time,
-                            $scheduleTemplate->end_time
-                        );
-
-                        Schedule::updateOrCreate(
-                            ['schedule_group_key' => $groupKey],
-                            [
-                                'student_id' => $student->id,
-                                'user_type' => 'student',
-                                'day_of_week' => $days[0],
-                                'schedule_days' => $days,
-                                'start_time' => $scheduleTemplate->start_time,
-                                'end_time' => $scheduleTemplate->end_time,
-                            ]
-                        );
-                    }
-                }
-            }
-
-            return redirect()->route('schedule.index')->with('success', 'Student added successfully. Manage schedules if needed.');
-        } elseif ($type === 'employee') {
+        if ($type === 'employee') {
             $validated = $request->validate([
                 'first_name' => 'required|string',
                 'last_name' => 'required|string',
@@ -350,25 +296,13 @@ class UserController extends Controller
     }
 
     /**
-     * Update user
+     * Update employee/faculty or visitor (Student removed)
      */
     public function update(Request $request, $id)
     {
         $type = $request->input('user_type');
 
-        if ($type === 'student') {
-            $student = Student::findOrFail($id);
-            $validated = $request->validate([
-                'first_name' => 'required|string',
-                'last_name' => 'required|string',
-                'course' => 'nullable|string',
-                'section' => 'nullable|string',
-            ]);
-
-            $student->update($validated);
-
-            return redirect()->route('users.index')->with('success', 'Student updated successfully');
-        } elseif ($type === 'employee') {
+        if ($type === 'employee') {
             $employee = Employee::findOrFail($id);
             $validated = $request->validate([
                 'first_name' => 'required|string',
@@ -403,16 +337,13 @@ class UserController extends Controller
     }
 
     /**
-     * Delete user
+     * Delete employee/faculty or visitor (Student removed)
      */
     public function destroy(Request $request, $id)
     {
         $type = $request->input('user_type');
 
-        if ($type === 'student') {
-            Student::findOrFail($id)->delete();
-            return redirect()->route('users.index')->with('success', 'Student deleted successfully');
-        } elseif ($type === 'employee') {
+        if ($type === 'employee') {
             $employee = Employee::findOrFail($id);
 
             if ($employee->status === 'active') {

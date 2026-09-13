@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.public')
 
 @section('title', 'Register Visitor')
 
@@ -8,6 +8,25 @@
     <p>Register new visitor or check-in existing visitor</p>
 </div>
 
+@if (session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-circle-check"></i> {{ session('success') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+@endif
+
+@if ($errors->any())
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>Please fix the following:</strong>
+        <ul class="mb-0 mt-2">
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+@endif
+
 <div class="row">
     <!-- Registration Form -->
     <div class="col-lg-6 mb-4">
@@ -16,7 +35,7 @@
                 <i class="fas fa-user-plus"></i> New Visitor Registration
             </div>
             <div class="card-body">
-                <form id="visitorForm" enctype="multipart/form-data">
+                <form id="visitorForm" method="POST" action="{{ route('visitor.store') }}" enctype="multipart/form-data">
                     @csrf
                     
                     <div class="mb-3">
@@ -58,7 +77,7 @@
                         <textarea class="form-control" name="remarks" rows="2" placeholder="Additional remarks..."></textarea>
                     </div>
 
-                    <input type="hidden" name="photo" id="photoInput">
+                    <input type="hidden" id="photoInput" name="photo_base64">
 
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-primary btn-lg">
@@ -120,6 +139,49 @@
             </div>
         </div>
 
+        <!-- Success Modal -->
+        <div class="modal fade" id="visitorSuccessModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="fas fa-circle-check text-success"></i> Visitor Registered</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body text-center py-4">
+                        <div class="mb-3" style="font-size: 56px; color: #198754;">
+                            <i class="fas fa-user-check"></i>
+                        </div>
+                        <h5 id="visitorSuccessTitle" class="mb-2">Registration successful</h5>
+                        <p id="visitorSuccessMessage" class="mb-0 text-muted">--</p>
+                    </div>
+                    <div class="modal-footer justify-content-center">
+                        <button type="button" class="btn btn-success" data-bs-dismiss="modal">OK</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Checkout Success Modal -->
+        <div class="modal fade" id="checkoutSuccessModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="fas fa-circle-check text-success"></i> Visitor Checked Out</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body text-center py-4">
+                        <div class="mb-3" style="font-size: 56px; color: #198754;">
+                        </div>
+                        <h5 class="mb-2">Visitor checked out successfully.</h5>
+                        <p id="checkoutSuccessMessage" class="mb-0 text-muted">--</p>
+                    </div>
+                    <div class="modal-footer justify-content-center">
+                        <button type="button" class="btn btn-success" data-bs-dismiss="modal">OK</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Webcam Capture Modal -->
         <div class="modal fade" id="webcamModal" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-lg">
@@ -144,6 +206,7 @@
                 </div>
             </div>
         </div>
+
     </div>
 </div>
 
@@ -171,11 +234,48 @@
                             </tr>
                         </thead>
                         <tbody id="visitorsTableBody">
-                            <tr>
-                                <td colspan="9" class="text-center text-muted">
-                                    <i class="fas fa-spinner fa-spin"></i> Loading visitors...
-                                </td>
-                            </tr>
+                            @forelse($todaysVisitors as $visitor)
+                                <tr id="visitor-row-{{ $visitor->id }}">
+                                    <td>
+                                        @if($visitor->photo_url)
+                                            <img src="{{ $visitor->photo_url }}" alt="Photo" class="profile-pic">
+                                        @else
+                                            <div class="profile-pic" style="background-color: #ddd; display: flex; align-items: center; justify-content: center;"><i class="fas fa-user"></i></div>
+                                        @endif
+                                    </td>
+                                    <td>{{ $visitor->full_name }}</td>
+                                    <td>{{ $visitor->phone }}</td>
+                                    <td>{{ $visitor->person_to_visit_name }}</td>
+                                    <td><span class="badge-purpose badge-{{ strtolower($visitor->purpose) }}">{{ $visitor->purpose }}</span></td>
+                                    <td>{{ $visitor->check_in_time }}</td>
+                                    <td>{{ $visitor->check_out_time }}</td>
+                                    <td>{{ $visitor->duration }}</td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            @if($visitor->time_out)
+                                                <button class="action-btn" title="View" onclick="viewVisitor({{ $visitor->id }})">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            @else
+                                                <button
+                                                    type="button"
+                                                    class="action-btn"
+                                                    title="Check Out"
+                                                    onclick="checkOutVisitor({{ $visitor->id }})"
+                                                >
+                                                    <i class="fas fa-sign-out-alt"></i>
+                                                </button>
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="9" class="text-center text-muted">
+                                        <i class="fas fa-spinner fa-spin"></i> Loading visitors...
+                                    </td>
+                                </tr>
+                            @endforelse
                         </tbody>
                     </table>
                 </div>
@@ -239,6 +339,27 @@
 <script>
     let currentPhoto = null;
     let webcamStream = null;
+    const visitorSuccessModalEl = document.getElementById('visitorSuccessModal');
+    const visitorSuccessModal = visitorSuccessModalEl ? bootstrap.Modal.getOrCreateInstance(visitorSuccessModalEl) : null;
+    const checkoutSuccessModalEl = document.getElementById('checkoutSuccessModal');
+    const checkoutSuccessModal = checkoutSuccessModalEl ? bootstrap.Modal.getOrCreateInstance(checkoutSuccessModalEl) : null;
+
+    function showVisitorSuccess(message, title = 'Registration successful') {
+        if (!visitorSuccessModal) {
+            alert(message || 'Visitor registered successfully!');
+            return;
+        }
+
+        document.getElementById('visitorSuccessTitle').textContent = title;
+        document.getElementById('visitorSuccessMessage').textContent = message || 'Visitor registered successfully.';
+        visitorSuccessModal.show();
+    }
+
+    @if (session('success'))
+    document.addEventListener('DOMContentLoaded', function() {
+        showVisitorSuccess(@json(session('success')));
+    });
+    @endif
 
     // Handle file upload
     document.getElementById('photoFile').addEventListener('change', function(e) {
@@ -292,6 +413,21 @@
         document.getElementById('uploadPlaceholder').style.display = 'block';
         document.getElementById('previewCard').style.display = 'none';
         document.getElementById('photoFile').value = '';
+    }
+
+    function dataUrlToFile(dataUrl, filename) {
+        const arr = dataUrl.split(',');
+        const mimeMatch = arr[0].match(/:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+
+        return new File([u8arr], filename, { type: mime });
     }
 
     function stopWebcam() {
@@ -386,15 +522,93 @@
 
     // Load today's visitors
     function loadTodaysVisitors() {
-        fetch('{{ route("visitor.index") }}')
-            .then(response => response.json())
-            .then(data => {
+        fetch('{{ route("visitor.index") }}?_=' + Date.now(), {
+            headers: {
+                'Accept': 'application/json'
+            },
+            cache: 'no-store'
+        })
+            .then(async response => {
+                let data = null;
+                try {
+                    data = await response.json();
+                } catch (parseError) {
+                    throw new Error('Server returned an invalid visitors response.');
+                }
+
+                if (!response.ok) {
+                    throw new Error(data?.message || 'Error loading visitors.');
+                }
+
                 renderVisitorTable(data);
             })
             .catch(error => {
                 console.error('Error loading visitors:', error);
                 document.getElementById('visitorsTableBody').innerHTML = '<tr><td colspan="9" class="text-center text-danger"><i class="fas fa-exclamation-circle"></i> Error loading visitors</td></tr>';
             });
+    }
+
+    function prependVisitorRow(visitor) {
+        const tbody = document.getElementById('visitorsTableBody');
+        if (!tbody) return;
+
+        const visitorRow = renderVisitorRow(visitor);
+
+        const noRowsMessage = tbody.querySelector('tr td[colspan]');
+        if (noRowsMessage) {
+            tbody.innerHTML = visitorRow;
+            return;
+        }
+
+        tbody.insertAdjacentHTML('afterbegin', visitorRow);
+    }
+
+    function renderVisitorRow(visitor) {
+        return `
+            <tr id="visitor-row-${visitor.id}">
+                <td>
+                    ${visitor.photo_path ? `<img src="${visitor.photo_path}" alt="Photo" class="profile-pic">` : '<div class="profile-pic" style="background-color: #ddd; display: flex; align-items: center; justify-content: center;"><i class="fas fa-user"></i></div>'}
+                </td>
+                <td>${visitor.full_name || '-'}</td>
+                <td>${visitor.phone || '-'}</td>
+                <td>${visitor.person_to_visit_name || 'N/A'}</td>
+                <td><span class="badge-purpose badge-${String(visitor.purpose || 'other').toLowerCase()}">${visitor.purpose || 'Other'}</span></td>
+                <td class="visitor-time-in">${visitor.time_in ? formatTime(visitor.time_in) : '-'}</td>
+                <td class="visitor-time-out">${visitor.time_out ? formatTime(visitor.time_out) : '--'}</td>
+                <td class="visitor-duration">${visitor.duration || '-'}</td>
+                <td>
+                    <div class="action-buttons">
+                        ${visitor.time_out ? `
+                            <button type="button" class="action-btn" title="View" onclick="viewVisitor(${visitor.id})">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        ` : `
+                            <button
+                                type="button"
+                                class="action-btn"
+                                title="Check Out"
+                                onclick="checkOutVisitor(${visitor.id})"
+                            >
+                                <i class="fas fa-sign-out-alt"></i>
+                            </button>
+                        `}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+
+    function updateVisitorRow(visitor) {
+        const tbody = document.getElementById('visitorsTableBody');
+        if (!tbody || !visitor || !visitor.id) return;
+
+        const existingRow = document.getElementById(`visitor-row-${visitor.id}`);
+        const rowHtml = renderVisitorRow(visitor);
+
+        if (existingRow) {
+            existingRow.outerHTML = rowHtml;
+            return;
+        }
     }
 
     function renderVisitorTable(visitors) {
@@ -407,7 +621,7 @@
         }
 
         tbody.innerHTML = visitors.map(visitor => `
-            <tr>
+            <tr id="visitor-row-${visitor.id}">
                 <td>
                     ${visitor.photo_path ? `<img src="${visitor.photo_path}" alt="Photo" class="profile-pic">` : '<div class="profile-pic" style="background-color: #ddd; display: flex; align-items: center; justify-content: center;"><i class="fas fa-user"></i></div>'}
                 </td>
@@ -421,11 +635,16 @@
                 <td>
                     <div class="action-buttons">
                         ${visitor.time_out ? `
-                            <button class="action-btn" title="View" onclick="viewVisitor(${visitor.id})">
+                            <button type="button" class="action-btn" title="View" onclick="viewVisitor(${visitor.id})">
                                 <i class="fas fa-eye"></i>
                             </button>
                         ` : `
-                            <button class="action-btn" title="Check Out" onclick="checkOutVisitor(${visitor.id})">
+                            <button
+                                type="button"
+                                class="action-btn"
+                                title="Check Out"
+                                onclick="checkOutVisitor(${visitor.id})"
+                            >
                                 <i class="fas fa-sign-out-alt"></i>
                             </button>
                         `}
@@ -481,22 +700,86 @@
         }
     }
 
-    function checkOutVisitor(id) {
-        if (confirm('Check out this visitor?')) {
-            fetch(`/visitor/${id}/checkout`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                alert('Visitor checked out successfully');
-                loadTodaysVisitors();
-            })
-            .catch(error => console.error('Error:', error));
+    function showCheckoutSuccessModal(message) {
+        const modalElement = document.getElementById('checkoutSuccessModal');
+        const messageElement = document.getElementById('checkoutSuccessMessage');
+
+        if (!modalElement || !messageElement || !window.bootstrap || !bootstrap.Modal) {
+            alert(message || 'Visitor checked out successfully.');
+            return;
         }
+
+        messageElement.textContent = message || 'Visitor checked out successfully.';
+        bootstrap.Modal.getOrCreateInstance(modalElement).show();
+    }
+
+    function checkOutVisitor(id) {
+        const btn = document.querySelector(`#visitor-row-${id} button[onclick*="checkOutVisitor"]`);
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            btn.style.opacity = '0.6';
+            btn.style.pointerEvents = 'none';
+        }
+        fetch(`/visitor/${id}/checkout`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+            }
+        })
+        .then(async response => {
+            let data = null;
+
+            try {
+                data = await response.json();
+            } catch (parseError) {
+                throw new Error('Server returned an invalid checkout response.');
+            }
+
+            // Handle duplicate checkout (409) as success - already checked out, update UI
+            if (response.status === 409 && data?.visitor) {
+                updateVisitorRow(data.visitor);
+                showCheckoutSuccessModal(data.message || 'Visitor already checked out.');
+                loadTodaysVisitors();
+                return data;
+            }
+
+            if (!response.ok) {
+                throw new Error(data?.message || 'Unable to check out visitor.');
+            }
+
+            if (data.visitor) {
+                updateVisitorRow(data.visitor);
+            }
+
+            showCheckoutSuccessModal(data.message || 'Visitor checked out successfully.');
+
+            return data;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert(error.message || 'Unable to check out visitor.');
+            // Re-enable button on error so user can retry (unless already checked out)
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sign-out-alt"></i>';
+                btn.style.opacity = '1';
+                btn.style.pointerEvents = 'auto';
+            }
+        });
+    }
+
+    if (document.getElementById('checkoutSuccessModal')) {
+        document.getElementById('checkoutSuccessModal').addEventListener('hidden.bs.modal', function() {
+            loadTodaysVisitors();
+        });
+    }
+
+    if (visitorSuccessModalEl) {
+        visitorSuccessModalEl.addEventListener('hidden.bs.modal', function() {
+            loadTodaysVisitors();
+        });
     }
 
     function viewVisitor(id) {
@@ -514,37 +797,64 @@
         formData.append('person_to_visit', document.querySelector('select[name="person_to_visit"]').value);
         formData.append('purpose', document.querySelector('select[name="purpose"]').value);
         formData.append('remarks', document.querySelector('textarea[name="remarks"]').value);
+        const photoBase64 = document.getElementById('photoInput').value;
+        if (photoBase64 && photoBase64.startsWith('data:image/')) {
+            formData.append('photo_base64', photoBase64);
+        }
 
-        // Add photo if exists
+        // Add photo as an actual file for backend validation/storage.
         const photoInput = document.getElementById('photoFile');
         if (photoInput.files.length > 0) {
             formData.append('photo', photoInput.files[0]);
+        } else if (currentPhoto && currentPhoto.startsWith('data:image/')) {
+            const capturedFile = dataUrlToFile(currentPhoto, `visitor_${Date.now()}.jpg`);
+            formData.append('photo', capturedFile);
         }
 
         fetch('{{ route("visitor.store") }}', {
             method: 'POST',
             body: formData,
             headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
             }
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.message) {
-                alert('Visitor registered successfully!');
-                document.getElementById('visitorForm').reset();
-                removePhoto();
-                loadTodaysVisitors();
+        .then(async response => {
+            let payload = null;
+            try {
+                payload = await response.json();
+            } catch (parseError) {
+                throw new Error('Server returned an invalid response.');
             }
+
+            if (!response.ok) {
+                const validationMessage = payload?.message
+                    || Object.values(payload?.errors || {}).flat().join(' ')
+                    || 'Error registering visitor.';
+                throw new Error(validationMessage);
+            }
+
+            return payload;
+        })
+        .then(data => {
+            showVisitorSuccess(data.message || 'Visitor registered successfully!');
+            document.getElementById('visitorForm').reset();
+            removePhoto();
+            if (data.visitor) {
+                prependVisitorRow(data.visitor);
+            }
+            loadTodaysVisitors();
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Error registering visitor. Check console for details.');
+            alert(error.message || 'Error registering visitor. Check console for details.');
         });
     });
 
     // Load visitors on page load
+    loadTodaysVisitors();
     document.addEventListener('DOMContentLoaded', loadTodaysVisitors);
+    window.addEventListener('pageshow', loadTodaysVisitors);
 
     // Refresh visitors every 30 seconds
     setInterval(loadTodaysVisitors, 30000);

@@ -5,10 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Employee;
 use App\Models\EmployeeCredential;
 use App\Models\EmployeeAttendance;
+use App\Models\Schedule;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class WebAuthnController extends Controller
 {
@@ -50,9 +51,9 @@ class WebAuthnController extends Controller
     }
 
     /**
-     * Show the ZK9500 enrollment page (dedicated)
+     * Show the dedicated ZK9500 enrollment page (admin only)
      */
-    public function zk9500EnrollPage(Request $request)
+    public function zk9500EnrollPage()
     {
         $employees = Employee::orderBy('first_name')->orderBy('last_name')->get();
 
@@ -62,22 +63,24 @@ class WebAuthnController extends Controller
                 'employeeNo' => $emp->employee_id_number,
                 'name' => $emp->name,
             ];
-        })->toArray();
+        })->values();
 
-        return view('scan.zk9500_enroll', compact('employees', 'employeeDirectory'));
-    }
-
-    /**
-     * Proxy fingerprint-server /health to avoid CORS/port issues
-     */
-    public function fingerprintHealthProxy(Request $request)
-    {
+        // Check enrollment status via fingerprint-server DB or fallback to empty
+        $enrolledIds = [];
         try {
-            $res = Http::timeout(2)->get('http://127.0.0.1:3001/health');
-            return response($res->body(), $res->status())->header('Content-Type', 'application/json');
-        } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'message' => 'proxy error', 'error' => $e->getMessage()], 502);
+            // Try to get enrolled fingerprints from DB; if table missing fallback to empty
+            if (\Illuminate\Support\Facades\Schema::hasTable('employee_fingerprints')) {
+                $enrolledIds = \Illuminate\Support\Facades\DB::table('employee_fingerprints')
+                    ->where('is_active', 1)
+                    ->pluck('employee_id')
+                    ->map(fn($id) => (string) $id)
+                    ->toArray();
+            }
+        } catch (\Throwable $e) {
+            $enrolledIds = [];
         }
+
+        return view('scan.zk9500_enroll', compact('employees', 'employeeDirectory', 'enrolledIds'));
     }
 
     /**
@@ -234,12 +237,34 @@ class WebAuthnController extends Controller
     }
 
     /**
+     * Check if employee has a schedule for today (dynamic date, not hardcoded)
+     */
+    private function hasScheduleForToday(int $employeeId): bool
+    {
+        $todayDay = Carbon::now()->format('l'); // Monday, Tuesday, etc. in Asia/Manila
+        $schedules = Schedule::where('employee_id', $employeeId)
+            ->where(function ($q) {
+                $q->where('user_type', 'employee')->orWhereNull('user_type');
+            })->get();
+
+        foreach ($schedules as $schedule) {
+            $days = $schedule->days_list; // uses Schedule::normalizeDays + fallback
+            if (in_array($todayDay, $days, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Verify authentication and record attendance
      */
     public function verifyAuthentication(Request $request)
     {
         $request->validate([
             'credential_id' => 'required|string',
+            'employee_id' => 'nullable|exists:employees,id',
         ]);
 
         // Find the credential
@@ -255,11 +280,46 @@ class WebAuthnController extends Controller
             ]);
         }
 
-        // Update sign count
+        // Strict verification: if a specific employee was selected, fingerprint must belong to that employee
+        $selectedId = $request->input('employee_id');
+        if ($selectedId && (int) $credential->employee_id !== (int) $selectedId) {
+            $selectedEmp = Employee::find($selectedId);
+            $selectedInfo = $selectedEmp ? "{$selectedEmp->name} ({$selectedEmp->employee_id_number})" : "selected employee";
+            $matchedEmp = $credential->employee;
+            return response()->json([
+                'success' => false,
+                'matched' => false,
+                'schedule_valid' => true,
+                'message' => "Verification failed — fingerprint does not belong to selected employee {$selectedInfo}. It belongs to {$matchedEmp->name} ({$matchedEmp->employee_id_number}). Attendance not recorded.",
+                'selected_employee' => $selectedEmp ? ['id' => $selectedEmp->id, 'name' => $selectedEmp->name, 'employee_id' => $selectedEmp->employee_id_number] : null,
+                'matched_employee' => ['id' => $matchedEmp->id, 'name' => $matchedEmp->name, 'employee_id' => $matchedEmp->employee_id_number],
+            ]);
+        }
+
+        // Update sign count (only after strict check passes)
         $credential->increment('sign_count');
 
         // Record attendance
         $employee = $credential->employee;
+
+        // Schedule validation: check if employee has schedule today
+        if (!$this->hasScheduleForToday($employee->id)) {
+            $todayDay = Carbon::now()->format('l');
+            $todayDate = Carbon::now()->format('M d, Y');
+            Session::forget('webauthn_auth_challenge');
+            return response()->json([
+                'success' => false,
+                'matched' => true,
+                'schedule_valid' => false,
+                'message' => "Attendance rejected — {$employee->name} ({$employee->employee_id_number}) has no schedule for today ({$todayDay}, {$todayDate}).",
+                'employee' => [
+                    'id' => $employee->id,
+                    'employee_id' => $employee->employee_id_number,
+                    'name' => $employee->name,
+                    'department' => $employee->department,
+                ],
+            ]);
+        }
         $today = now()->toDateString();
 
         $attendance = EmployeeAttendance::where('employee_id', $employee->id)
@@ -313,8 +373,8 @@ class WebAuthnController extends Controller
             'attendance' => [
                 'action' => $action,
                 'message' => $message,
-                'time_in' => $attendance->time_in?->format('h:i A'),
-                'time_out' => $attendance->time_out?->format('h:i A'),
+                'time_in' => $attendance->time_in ? Carbon::parse($attendance->time_in)->format('h:i A') : null,
+                'time_out' => $attendance->time_out ? Carbon::parse($attendance->time_out)->format('h:i A') : null,
                 'status' => $attendance->status,
             ],
             'message' => "Welcome, {$employee->name}! {$message}"

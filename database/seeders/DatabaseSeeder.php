@@ -22,8 +22,8 @@ class DatabaseSeeder extends Seeder
             'email' => 'test@example.com',
         ]);
 
-        $this->call([
-            StudentSeeder::class,
-        ]);
+        // StudentSeeder removed - system now focuses on Employees/Faculty and Visitors only
+        // No student seeding required
+        $this->call([]);
     }
 }

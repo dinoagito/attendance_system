@@ -59,4 +59,23 @@ class Employee extends Model
     {
         return $this->hasOne(EmployeeCredential::class, 'employee_id');
     }
+
+    /**
+     * Get employee ZK9500 fingerprints
+     */
+    public function fingerprints()
+    {
+        return $this->hasMany(EmployeeFingerprint::class, 'employee_id')->where('is_active', 1);
+    }
+
+    /**
+     * Check if employee has enrolled fingerprint
+     */
+    public function getIsEnrolledAttribute(): bool
+    {
+        if (array_key_exists('fingerprints_count', $this->attributes)) {
+            return (int) $this->fingerprints_count > 0;
+        }
+        return $this->fingerprints()->exists();
+    }
 }

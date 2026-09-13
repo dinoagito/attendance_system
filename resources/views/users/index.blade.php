@@ -4,8 +4,8 @@
 
 @section('content')
 <div class="page-header">
-    <h1>Registration Management</h1>
-    <p>Manage students, employees, and visitors</p>
+    <h1>Registration Management - Employees / Faculty & Visitors</h1>
+    <p>Manage employees, faculty and visitors</p>
 </div>
 
 @if($message = session('success'))
@@ -22,18 +22,13 @@
     </div>
 @endif
 
-<!-- Tabs for different user types -->
+<!-- Tabs for different user types - Student removed, Employee/Faculty and Visitors only -->
 <div class="row mb-4">
     <div class="col-12">
         <ul class="nav nav-tabs" id="userTabs" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link active" style="color: #198754;" id="students-tab" data-bs-toggle="tab" data-bs-target="#students" type="button" role="tab" aria-controls="students" aria-selected="true">
-                    <i class="fas fa-graduation-cap"></i> Students
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" style="color: #198754;" id="employees-tab" data-bs-toggle="tab" data-bs-target="#employees" type="button" role="tab" aria-controls="employees" aria-selected="false">
-                    <i class="fas fa-users"></i> Employees
+                <button class="nav-link active" style="color: #198754;" id="employees-tab" data-bs-toggle="tab" data-bs-target="#employees" type="button" role="tab" aria-controls="employees" aria-selected="true">
+                    <i class="fas fa-users"></i> Employees / Faculty
                 </button>
             </li>
             <li class="nav-item" role="presentation">
@@ -46,80 +41,12 @@
 </div>
 
 <div class="tab-content" id="userTabContent">
-    <!-- Students Tab -->
-    <div class="tab-pane fade show active" id="students" role="tabpanel" aria-labelledby="students-tab">
-        <div class="row mb-4">
-            <div class="col-12">
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addStudentModal">
-                    <i class="fas fa-plus"></i> Add Student
-                </button>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-header">
-                <i class="fas fa-table"></i> Student List ({{ $students->total() }} students)
-            </div>
-            <div class="card-body">
-                <div class="table-container">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>ID</th>
-                                <th>Course</th>
-                                <th>Section</th>
-                                <th>RFID UID</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($students as $student)
-                                <tr>
-                                    <td><strong>{{ $student->full_name }}</strong></td>
-                                    <td>{{ $student->student_id_number }}</td>
-                                    <td>{{ $student->course ?? '-' }}</td>
-                                    <td>{{ $student->section ?? '-' }}</td>
-                                    <td>{{ $student->rfid_uid ?? '-' }}</td>
-                                    <td>
-                                        <div class="action-buttons">
-                                            <button class="action-btn edit-student" title="Edit" data-id="{{ $student->id }}" data-bs-toggle="modal" data-bs-target="#editStudentModal">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <form method="POST" action="{{ route('users.destroy', $student->id) }}" style="display:inline;">
-                                                @csrf
-                                                @method('DELETE')
-                                                <input type="hidden" name="user_type" value="student">
-                                                <button type="submit" class="action-btn delete" title="Delete" onclick="return confirm('Are you sure?')">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" style="text-align: center; padding: 30px; color: #999;">
-                                        <i class="fas fa-inbox"></i> No students found
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-                <div style="margin-top: 20px;">
-                    {{ $students->links() }}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Employees Tab -->
-    <div class="tab-pane fade" id="employees" role="tabpanel" aria-labelledby="employees-tab">
+    <!-- Employees / Faculty Tab - now default active -->
+    <div class="tab-pane fade show active" id="employees" role="tabpanel" aria-labelledby="employees-tab">
         <div class="row mb-4">
             <div class="col-12 d-flex gap-2 flex-wrap">
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEmployeeModal">
-                    <i class="fas fa-plus"></i> Add Employee
+                    <i class="fas fa-plus"></i> Add Employee / Faculty
                 </button>
 
                 <a href="{{ route('users.index', array_merge(request()->query(), ['tab' => 'employees', 'show_all_employees' => 1, 'new_employee_id' => null])) }}" class="btn btn-outline-secondary">
@@ -159,7 +86,7 @@
                             <i class="fas fa-search"></i> Search
                         </button>
                         <a href="{{ route('users.employees.print', ['employee_search' => $employeeFilters['search'] ?? '', 'employee_status' => $employeeFilters['status'] ?? '']) }}" target="_blank" class="btn btn-outline-dark">
-                            <i class="fas fa-file-pdf"></i> Printable List (PDF)
+                            <i class="fas fa-file-pdf"></i> Print Employee List
                         </a>
                     </div>
                 </form>
@@ -172,7 +99,7 @@
                 @if($newEmployeeId)
                     Newly Saved Employee ({{ $employees->total() }} record)
                 @elseif($shouldShowEmployeeList)
-                    Employee List ({{ $employees->total() }} employees)
+                    Employee / Faculty List ({{ $employees->total() }} employees)
                 @else
                     Employee List Hidden
                 @endif
@@ -217,7 +144,8 @@
                                                 <button class="action-btn edit-employee" title="Edit" data-id="{{ $employee->id }}" data-bs-toggle="modal" data-bs-target="#editEmployeeModal">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
-                                                <a href="{{ route('scan.employee.zk9500.enroll', ['employee_id' => $employee->employee_id_number]) }}" class="action-btn" title="Scan Fingerprint" style="background:#198754;color:#fff;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">
+                                                @php $isEnrolled = ($employee->fingerprints_count ?? 0) > 0; @endphp
+                                                <a href="{{ route('scan.employee.zk9500.enroll', ['employee_id' => $employee->employee_id_number]) }}" class="action-btn" title="{{ $isEnrolled ? 'Change Fingerprint (already enrolled)' : 'Enroll Fingerprint' }}" style="background:{{ $isEnrolled ? '#ffc107;color:#111;border:1px solid #e0a800' : '#198754;color:#fff' }};display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">
                                                     <i class="fas fa-fingerprint"></i>
                                                 </a>
                                                 <a href="/schedule?employee_id={{ $employee->id }}" class="action-btn" title="Schedule" style="background:#198754;color:#fff;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">
@@ -244,8 +172,15 @@
                             </tbody>
                         </table>
                     </div>
-                    <div style="margin-top: 20px;">
-                        {{ $employees->links() }}
+                    <div class="d-flex justify-content-between align-items-center" style="margin-top: 20px;">
+                        <small class="text-muted">
+                            @if($employees->total() > 0)
+                                Showing {{ $employees->firstItem() }}–{{ $employees->lastItem() }} of {{ $employees->total() }}
+                            @endif
+                        </small>
+                        <div>
+                            {{ $employees->appends(request()->except('employee_page'))->links('pagination::bootstrap-5') }}
+                        </div>
                     </div>
                 @endif
             </div>
@@ -358,142 +293,12 @@
     </div>
 </div>
 
-<!-- Add Student Modal -->
-<div class="modal fade" id="addStudentModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add New Student</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="POST" action="{{ route('users.store') }}">
-                @csrf
-                <input type="hidden" name="user_type" value="student">
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">First Name *</label>
-                            <input type="text" name="first_name" class="form-control @error('first_name') is-invalid @enderror" placeholder="Enter first name" required>
-                            @error('first_name') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Last Name *</label>
-                            <input type="text" name="last_name" class="form-control @error('last_name') is-invalid @enderror" placeholder="Enter last name" required>
-                            @error('last_name') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Student ID Number *</label>
-                        <input type="text" name="student_id_number" class="form-control @error('student_id_number') is-invalid @enderror" placeholder="e.g., STU-2024-001" required>
-                        @error('student_id_number') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Course</label>
-                            <input type="text" name="course" class="form-control @error('course') is-invalid @enderror" placeholder="e.g., CS-101">
-                            @error('course') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Section</label>
-                            <input type="text" name="section" class="form-control @error('section') is-invalid @enderror" placeholder="e.g., A1">
-                            @error('section') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">RFID UID</label>
-                        <input type="text" name="rfid_uid" class="form-control @error('rfid_uid') is-invalid @enderror" placeholder="e.g., RF-001234">
-                        @error('rfid_uid') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-
-                    <!-- Schedule Section -->
-                    <hr>
-                    <h6 class="mb-3"><i class="fas fa-calendar"></i> Select Existing Schedule (Optional)</h6>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Schedule Template</label>
-                        <select name="schedule_id" class="form-control @error('schedule_id') is-invalid @enderror">
-                            <option value="">-- No schedule (assign later) --</option>
-                            @forelse($scheduleTemplates ?? [] as $schedule)
-                                <option value="{{ $schedule->id }}">
-                                    {{ $schedule->employee?->full_name ?? $schedule->student?->full_name ?? 'Schedule' }} - {{ $schedule->days_display }} | 
-                                    {{ date('h:i A', strtotime($schedule->start_time)) }} - {{ date('h:i A', strtotime($schedule->end_time)) }}
-                                    @php
-                                        $start = \Carbon\Carbon::parse($schedule->start_time);
-                                        $end = \Carbon\Carbon::parse($schedule->end_time);
-                                        $hours = $end->diffInHours($start);
-                                    @endphp
-                                    ({{ $hours }}h)
-                                </option>
-                            @empty
-                                <option value="" disabled>No schedule templates available - create one in Schedule Management first</option>
-                            @endforelse
-                        </select>
-                        @error('schedule_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        <small class="form-text text-muted">Select a schedule template to assign to this student, or leave empty to assign later from Schedule Management.</small>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary">Add Student</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Edit Student Modal -->
-<div class="modal fade" id="editStudentModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Edit Student</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="POST" id="editStudentForm">
-                @csrf
-                @method('PUT')
-                <input type="hidden" name="user_type" value="student">
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">First Name *</label>
-                            <input type="text" name="first_name" id="edit_first_name" class="form-control" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Last Name *</label>
-                            <input type="text" name="last_name" id="edit_last_name" class="form-control" required>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Course</label>
-                            <input type="text" name="course" id="edit_course" class="form-control">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Section</label>
-                            <input type="text" name="section" id="edit_section" class="form-control">
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary">Update Student</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Add Employee Modal -->
+<!-- Add Employee / Faculty Modal -->
 <div class="modal fade" id="addEmployeeModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Add New Employee</h5>
+                <h5 class="modal-title">Add New Employee / Faculty</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="{{ route('users.store') }}">
@@ -521,8 +326,8 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Department</label>
-                        <input type="text" name="department" class="form-control @error('department') is-invalid @enderror" placeholder="e.g., Administration">
+                        <label class="form-label">Department / Office</label>
+                        <input type="text" name="department" class="form-control @error('department') is-invalid @enderror" placeholder="e.g., Administration, Faculty, HR">
                         @error('department') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
 
@@ -558,7 +363,7 @@
                             <option value="">-- No schedule (assign later) --</option>
                             @forelse($scheduleTemplates ?? [] as $schedule)
                                 <option value="{{ $schedule->id }}">
-                                    {{ $schedule->employee?->full_name ?? $schedule->student?->full_name ?? 'Schedule' }} - {{ $schedule->days_display }} | 
+                                    {{ $schedule->employee?->full_name ?? 'Schedule' }} - {{ $schedule->days_display }} | 
                                     {{ date('h:i A', strtotime($schedule->start_time)) }} - {{ date('h:i A', strtotime($schedule->end_time)) }}
                                     @php
                                         $start = \Carbon\Carbon::parse($schedule->start_time);
@@ -577,7 +382,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary">Add Employee</button>
+                    <button type="submit" class="btn btn-primary">Add Employee / Faculty</button>
                 </div>
             </form>
         </div>
@@ -589,7 +394,7 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Edit Employee</h5>
+                <h5 class="modal-title">Edit Employee / Faculty</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" id="editEmployeeForm">
@@ -609,7 +414,7 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Department</label>
+                        <label class="form-label">Department / Office</label>
                         <input type="text" name="department" id="edit_emp_department" class="form-control">
                     </div>
 
@@ -774,22 +579,6 @@
 </div>
 
 <script>
-document.querySelectorAll('.edit-student').forEach(btn => {
-    btn.addEventListener('click', async function() {
-        const studentId = this.dataset.id;
-        const response = await fetch(`/api/students/${studentId}`);
-        const student = await response.json();
-        
-        document.getElementById('edit_first_name').value = student.first_name;
-        document.getElementById('edit_last_name').value = student.last_name;
-        document.getElementById('edit_course').value = student.course || '';
-        document.getElementById('edit_section').value = student.section || '';
-        
-        const form = document.getElementById('editStudentForm');
-        form.action = `/users/${studentId}`;
-    });
-});
-
 document.querySelectorAll('.edit-employee').forEach(btn => {
     btn.addEventListener('click', async function() {
         const employeeId = this.dataset.id;

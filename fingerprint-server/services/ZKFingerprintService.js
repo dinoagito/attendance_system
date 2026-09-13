@@ -8,8 +8,7 @@ const path = require('path');
 const DatabaseService = require('./DatabaseService');
 
 // Fingerprint matching threshold (0-100, higher = stricter)
-const MATCH_THRESHOLD = parseInt(process.env.FINGERPRINT_THRESHOLD) || 35;
-const ALLOW_SELECTED_EMPLOYEE_FALLBACK = process.env.ALLOW_SELECTED_EMPLOYEE_FALLBACK === 'true';
+const MATCH_THRESHOLD = parseInt(process.env.FINGERPRINT_THRESHOLD) || 75;
 
 class ZKFingerprintService {
     static instance = null;
@@ -340,7 +339,7 @@ class ZKFingerprintService {
         }
 
         if (this.isSimulationMode) {
-            return this.simulateCapture();
+            return await this.simulateCapture();
         }
 
         return new Promise((resolve, reject) => {
@@ -363,12 +362,35 @@ class ZKFingerprintService {
                 const startTime = Date.now();
                 const timeout = 15000; // 15 seconds
                 let attempts = 0;
-                
+
+                // Track completion so the capture loop can never keep running in the
+                // background after a successful capture (or after an error/timeout).
+                // A lingering setTimeout from a previous "still waiting for finger" tick
+                // used to keep polling the SDK, which then interfered with the next scan
+                // and caused spurious "Capture timeout" errors after a successful result.
+                let settled = false;
+                let captureTimer = null;
+
+                const finishCapture = (callback, value) => {
+                    if (settled) return;
+                    settled = true;
+                    if (captureTimer) {
+                        clearTimeout(captureTimer);
+                        captureTimer = null;
+                    }
+                    callback(value);
+                };
+
                 const captureLoop = () => {
+                    captureTimer = null;
+                    if (settled) return;
                     attempts++;
                     
                     if (Date.now() - startTime > timeout) {
-                        reject(new Error('Capture timeout - please place finger on scanner and try again'));
+                        finishCapture(
+                            reject,
+                            new Error('Capture timeout - please place finger on scanner and try again')
+                        );
                         return;
                     }
                     
@@ -392,7 +414,7 @@ class ZKFingerprintService {
                         
                         console.log(`✅ Fingerprint captured after ${attempts} attempts. Template size: ${actualSize}`);
                         
-                        resolve({
+                        finishCapture(resolve, {
                             success: true,
                             template: template,
                             quality: this.calculateQuality(templateBuffer, actualSize > 0 ? actualSize : 512),
@@ -403,7 +425,7 @@ class ZKFingerprintService {
                         if (attempts % 20 === 0) {
                             console.log(`Still waiting for finger... (${Math.round((Date.now() - startTime) / 1000)}s)`);
                         }
-                        setTimeout(captureLoop, 100);
+                        captureTimer = setTimeout(captureLoop, 100);
                     } else {
                         // Other error - provide meaningful message
                         const errorMessages = {
@@ -418,7 +440,7 @@ class ZKFingerprintService {
                             '-10': 'Not valid fingerprint'
                         };
                         const errorMsg = errorMessages[result.toString()] || `Unknown error (code: ${result})`;
-                        reject(new Error(`Capture failed: ${errorMsg}`));
+                        finishCapture(reject, new Error(`Capture failed: ${errorMsg}`));
                     }
                 };
                 
@@ -430,7 +452,12 @@ class ZKFingerprintService {
         });
     }
 
-    simulateCapture() {
+    async simulateCapture() {
+        // Simulate realistic fingerprint capture delay - wait for finger placement
+        // This prevents immediate enrollment completion without finger
+        console.log('Simulating fingerprint capture - waiting for finger placement...');
+        await new Promise(resolve => setTimeout(resolve, 2500));
+        
         const simulatedTemplate = Buffer.alloc(512);
         for (let i = 0; i < 512; i++) {
             simulatedTemplate[i] = Math.floor(Math.random() * 256);
@@ -443,7 +470,7 @@ class ZKFingerprintService {
             success: true,
             template: template,
             quality: 80 + Math.floor(Math.random() * 20),
-            message: 'Fingerprint captured (simulation mode)',
+            message: 'Fingerprint captured (simulation mode - no real scanner)',
             simulationMode: true
         };
     }
@@ -452,7 +479,6 @@ class ZKFingerprintService {
         return this.runExclusive('verify', async () => {
             const shouldRecordAttendance = options.allowAttendance === true;
             const targetEmployeeId = options.employeeId ? parseInt(options.employeeId) : null;
-            const preferSelectedEmployee = options.preferSelectedEmployee !== false;
 
             if (!this.isInitialized) {
                 throw new Error('Fingerprint scanner not initialized');
@@ -469,82 +495,25 @@ class ZKFingerprintService {
                 templateToVerify = captureResult.template;
             }
 
-            // Stability path: if UI already selected an employee, skip SDK template matching.
-            // This avoids native DBMatch/DBIdentify crashes seen on some ZK SDK builds.
-            if (targetEmployeeId && preferSelectedEmployee && shouldRecordAttendance) {
-                const selectedEmployee = await DatabaseService.getEmployeeById(targetEmployeeId);
-                if (!selectedEmployee) {
-                    throw new Error('Selected employee not found');
-                }
-
-                const attendanceResult = await DatabaseService.recordAttendance(selectedEmployee.id);
-                const todayAttendance = await DatabaseService.getTodayAttendance(selectedEmployee.id);
-
-                return {
-                    success: true,
-                    matched: true,
-                    employee: {
-                        employee_id: selectedEmployee.id,
-                        employee_name: selectedEmployee.name,
-                        employee_code: selectedEmployee.employee_id,
-                        department: selectedEmployee.department,
-                        position: selectedEmployee.position,
-                    },
-                    matchScore: 100,
-                    attendanceRecorded: true,
-                    verificationMode: 'selected-employee-stable',
-                    attendance: {
-                        ...attendanceResult,
-                        record: todayAttendance
-                    },
-                    message: `Welcome, ${selectedEmployee.name}! ${attendanceResult.message}`
-                };
-            }
-
             const storedTemplates = targetEmployeeId
                 ? await DatabaseService.getFingerprintTemplatesByEmployee(targetEmployeeId)
                 : await DatabaseService.getFingerprintTemplates();
 
             if (storedTemplates.length === 0) {
+                if (targetEmployeeId) {
+                    const selectedEmp = await DatabaseService.getEmployeeById(targetEmployeeId);
+                    const info = selectedEmp ? `${selectedEmp.name} (${selectedEmp.employee_id})` : 'selected employee';
+                    return {
+                        success: false,
+                        matched: false,
+                        schedule_valid: true,
+                        message: `Verification failed — selected employee ${info} has no enrolled fingerprint. Please enroll first.`
+                    };
+                }
                 return {
                     success: false,
                     matched: false,
                     message: 'No fingerprints enrolled in system'
-                };
-            }
-
-            // Optional fallback path (disabled by default):
-            // proceed with selected employee when capture succeeds, even if matching is unstable.
-            if (
-                ALLOW_SELECTED_EMPLOYEE_FALLBACK
-                && !this.isSimulationMode
-                && targetEmployeeId
-                && preferSelectedEmployee
-                && shouldRecordAttendance
-            ) {
-                const employee = {
-                    employee_id: storedTemplates[0].employee_id,
-                    employee_name: storedTemplates[0].employee_name,
-                    employee_code: storedTemplates[0].employee_code,
-                    department: storedTemplates[0].department,
-                    position: storedTemplates[0].position,
-                };
-
-                const attendanceResult = await DatabaseService.recordAttendance(employee.employee_id);
-                const todayAttendance = await DatabaseService.getTodayAttendance(employee.employee_id);
-
-                return {
-                    success: true,
-                    matched: true,
-                    employee,
-                    matchScore: 100,
-                    attendanceRecorded: true,
-                    verificationMode: 'selected-employee-stable',
-                    attendance: {
-                        ...attendanceResult,
-                        record: todayAttendance
-                    },
-                    message: `Welcome, ${employee.employee_name}! ${attendanceResult.message}`
                 };
             }
 
@@ -568,6 +537,23 @@ class ZKFingerprintService {
                 const attendanceResult = await DatabaseService.recordAttendance(matchResult.employee.employee_id);
                 const todayAttendance = await DatabaseService.getTodayAttendance(matchResult.employee.employee_id);
 
+                // Schedule validation: if no schedule today, reject attendance
+                if (attendanceResult.action === 'no_schedule') {
+                    return {
+                        success: false,
+                        matched: true,
+                        schedule_valid: false,
+                        employee: matchResult.employee,
+                        matchScore: displayScore,
+                        attendanceRecorded: false,
+                        attendance: {
+                            ...attendanceResult,
+                            record: todayAttendance
+                        },
+                        message: attendanceResult.message
+                    };
+                }
+
                 return {
                     success: true,
                     matched: true,
@@ -582,59 +568,43 @@ class ZKFingerprintService {
                 };
             }
 
-            // Controlled fallback (disabled by default):
-            // allow selected employee attendance when matching fails.
-            if (
-                ALLOW_SELECTED_EMPLOYEE_FALLBACK
-                && !this.isSimulationMode
-                && targetEmployeeId
-                && storedTemplates.length > 0
-            ) {
-                console.warn(`Using selected-employee fallback for employee ${targetEmployeeId}`);
-
-                const employee = {
-                    employee_id: storedTemplates[0].employee_id,
-                    employee_name: storedTemplates[0].employee_name,
-                    employee_code: storedTemplates[0].employee_code,
-                    department: storedTemplates[0].department,
-                    position: storedTemplates[0].position,
-                };
-
-                if (!shouldRecordAttendance) {
-                    return {
-                        success: true,
-                        matched: true,
-                        employee,
-                        matchScore: MATCH_THRESHOLD,
-                        attendanceRecorded: false,
-                        verificationMode: 'selected-employee-fallback',
-                        message: `Fingerprint verified for ${employee.employee_name}.`
-                    };
+            // Strict verification: if a specific employee was selected, do not allow another employee's fingerprint
+            if (targetEmployeeId) {
+                // Check if fingerprint belongs to someone else for clearer message (without recording)
+                try {
+                    const allTemplates = await DatabaseService.getFingerprintTemplates();
+                    const broadResult = await this.findMatch(templateToVerify, allTemplates);
+                    if (broadResult.matched) {
+                        const selectedEmp = await DatabaseService.getEmployeeById(targetEmployeeId);
+                        const selectedInfo = selectedEmp ? `${selectedEmp.name} (${selectedEmp.employee_id})` : `selected employee`;
+                        return {
+                            success: false,
+                            matched: false,
+                            schedule_valid: true,
+                            message: `Verification failed — fingerprint does not belong to selected employee ${selectedInfo}. It belongs to ${broadResult.employee.employee_name} (${broadResult.employee.employee_code}). Attendance not recorded.`,
+                            attempted_employee: selectedEmp,
+                            matched_employee: broadResult.employee,
+                        };
+                    }
+                } catch (e) {
+                    // ignore broad check errors, fall through to generic
                 }
-
-                const attendanceResult = await DatabaseService.recordAttendance(employee.employee_id);
-                const todayAttendance = await DatabaseService.getTodayAttendance(employee.employee_id);
-
+                const selectedEmp = await DatabaseService.getEmployeeById(targetEmployeeId);
+                const selectedInfo = selectedEmp ? `${selectedEmp.name} (${selectedEmp.employee_id})` : `selected employee`;
                 return {
-                    success: true,
-                    matched: true,
-                    employee,
-                    matchScore: MATCH_THRESHOLD,
-                    attendanceRecorded: true,
-                    verificationMode: 'selected-employee-fallback',
-                    attendance: {
-                        ...attendanceResult,
-                        record: todayAttendance
-                    },
-                    message: `Welcome, ${employee.employee_name}! ${attendanceResult.message}`
+                    success: false,
+                    matched: false,
+                    schedule_valid: true,
+                    message: `Fingerprint verification failed — fingerprint does not belong to selected employee ${selectedInfo}. Attendance not recorded.`
                 };
             }
 
+            // No selection (kiosk broad mode) — generic not matched
             return {
                 success: true,
                 matched: false,
                 attendanceRecorded: false,
-                message: 'Fingerprint not recognized. Please try again or contact administrator.'
+                message: 'Fingerprint not matched.'
             };
         });
     }
@@ -882,6 +852,9 @@ class ZKFingerprintService {
 
     async enrollFingerprint(employeeId, fingerIndex = 0) {
         return this.runExclusive('enroll', async () => {
+            if (this.isSimulationMode) {
+                throw new Error('Cannot enroll fingerprint in simulation mode. Please connect ZK9500 scanner device.');
+            }
             if (!this.isInitialized) {
                 throw new Error('Fingerprint scanner not initialized');
             }

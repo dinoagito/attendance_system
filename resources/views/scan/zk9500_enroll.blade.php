@@ -54,10 +54,10 @@
                 </div>
 
                 <div class="d-grid gap-2">
-                    <button id="btn-enroll" class="btn btn-success btn-lg" disabled>
+                    <button id="btn-enroll" class="btn btn-success" disabled style="padding:12px 18px; font-size:1.05rem; font-weight:600; border-radius:8px;">
                         <i class="fas fa-fingerprint"></i> Start Enrollment
                     </button>
-                    <button id="btn-reset" class="btn btn-outline-secondary">
+                    <button id="btn-reset" class="btn btn-outline-secondary" style="padding:9px 18px; border-radius:8px;">
                         <i class="fas fa-redo-alt"></i> Reset
                     </button>
                 </div>
@@ -153,6 +153,31 @@
     </div>
 </div>
 
+<!-- Re-enroll Confirmation Modal - Custom replacement for native confirm() -->
+<div class="modal fade" id="reenrollConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom: 1px solid #e0e0e0;">
+                <h5 class="modal-title" style="color: #856404;"><i class="fas fa-exclamation-triangle" style="color: #ffc107;"></i> Already Enrolled</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="mb-3" style="font-size: 52px; color: #ffc107;">
+                    <i class="fas fa-fingerprint"></i>
+                </div>
+                <p class="fs-5 mb-2" style="font-weight: 600; color: #212529;">This employee already has an enrolled fingerprint.</p>
+                <p class="text-muted mb-0" id="reenrollConfirmMessage">Re-enrolling will overwrite the existing fingerprint. Do you want to continue?</p>
+                <p class="text-muted small mt-2 mb-0" id="reenrollConfirmEmployee" style="font-weight: 500;"></p>
+            </div>
+            <div class="modal-footer justify-content-center gap-2">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="reenrollCancelBtn">Cancel</button>
+                <button type="button" class="btn btn-warning" id="reenrollContinueBtn" style="background-color: #ffc107; border-color: #ffc107; color: #212529; font-weight: 600;"><i class="fas fa-redo-alt"></i> Continue Re-enrollment</button>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
 @section('scripts')
 <script>
     const FINGERPRINT_SERVER_PRIMARY = 'http://127.0.0.1:3001';
@@ -160,6 +185,7 @@
     const pageParams = new URLSearchParams(window.location.search);
     const preselectEmployeeId = pageParams.get('employee_id');
     const employeeDirectory = @json($employeeDirectory ?? []);
+    const enrolledIds = @json($enrolledIds ?? []);
 
     let activeFingerprintServer = FINGERPRINT_SERVER_PRIMARY;
     let isEnrolling = false;
@@ -255,7 +281,15 @@
                 if (!proxyRes.ok) throw new Error('proxy health not ok');
                 const proxyData = await proxyRes.json();
                 console.log('[zk9500_enroll] health via proxy', proxyData);
-                if (proxyData?.status === 'ok' && (proxyData?.scanner?.initialized || proxyData?.scanner?.connected || proxyData?.scanner?.simulationMode)) {
+                // Check simulation first - show warning and disable enrollment
+                if (proxyData?.scanner?.simulationMode) {
+                    scannerStatus.className = 'badge bg-warning';
+                    scannerStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Simulation Mode';
+                    if (btnEnroll) btnEnroll.disabled = true;
+                    updateStatus('error', 'Simulation Mode', 'No real scanner connected. Enrollment requires ZK9500 device. Please connect scanner.');
+                    return;
+                }
+                if (proxyData?.status === 'ok' && (proxyData?.scanner?.initialized || proxyData?.scanner?.connected)) {
                     scannerStatus.className = 'badge bg-success';
                     scannerStatus.innerHTML = '<i class="fas fa-check-circle"></i> Connected (proxy)';
                     if (btnEnroll) btnEnroll.disabled = false;
@@ -268,7 +302,16 @@
             const data = await response.json();
             console.log('[zk9500_enroll] health via fetchFingerprint', activeFingerprintServer, data);
 
-            if (data?.status === 'ok' && (data?.scanner?.initialized || data?.scanner?.connected || data?.scanner?.simulationMode)) {
+            // Check simulation first
+            if (data?.scanner?.simulationMode) {
+                scannerStatus.className = 'badge bg-warning';
+                scannerStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Simulation Mode';
+                if (btnEnroll) btnEnroll.disabled = true;
+                updateStatus('error', 'Simulation Mode', 'No real scanner connected. Enrollment requires ZK9500 device. Please connect scanner.');
+                return;
+            }
+
+            if (data?.status === 'ok' && (data?.scanner?.initialized || data?.scanner?.connected)) {
                 scannerStatus.className = 'badge bg-success';
                 scannerStatus.innerHTML = '<i class="fas fa-check-circle"></i> Connected';
                 if (btnEnroll) btnEnroll.disabled = false;
@@ -289,7 +332,14 @@
                 if (proxyRes.ok) {
                     const proxyData = await proxyRes.json();
                     console.log('[zk9500_enroll] health via proxy fallback', proxyData);
-                    if (proxyData?.status === 'ok' && (proxyData?.scanner?.initialized || proxyData?.scanner?.connected || proxyData?.scanner?.simulationMode)) {
+                    if (proxyData?.scanner?.simulationMode) {
+                        scannerStatus.className = 'badge bg-warning';
+                        scannerStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Simulation Mode';
+                        if (btnEnroll) btnEnroll.disabled = true;
+                        updateStatus('error', 'Simulation Mode', 'No real scanner connected. Enrollment requires ZK9500 device. Please connect scanner.');
+                        return;
+                    }
+                    if (proxyData?.status === 'ok' && (proxyData?.scanner?.initialized || proxyData?.scanner?.connected)) {
                         scannerStatus.className = 'badge bg-success';
                         scannerStatus.innerHTML = '<i class="fas fa-check-circle"></i> Connected (proxy)';
                         if (btnEnroll) btnEnroll.disabled = false;
@@ -325,14 +375,62 @@
     function resetEnroll(){ setEnrolling(false); scannerVisual && (scannerVisual.className='scanner-container'); updateStatus('waiting','Ready to Enroll','Select an employee and click "Start Enrollment"'); showResult('waiting'); }
 
     document.addEventListener('DOMContentLoaded', function(){ updateClock(); setInterval(updateClock,1000); pollServerHealth(); setInterval(pollServerHealth,3000);
-        if(preselectEmployeeId){ const employee = findEmployeeByNumber(preselectEmployeeId) || employeeDirectory.find(emp => String(emp.id) === String(preselectEmployeeId)); if(employee){ enrollEmployee.value = String(employee.id); selectedEmpName.textContent = employee.name; selectedEmpId.textContent = employee.employeeNo; employeeInfoDisplay.classList.remove('d-none'); btnEnroll && btnEnroll.focus(); } }
+        if(preselectEmployeeId){ const employee = findEmployeeByNumber(preselectEmployeeId) || employeeDirectory.find(emp => String(emp.id) === String(preselectEmployeeId)); if(employee){ enrollEmployee.value = String(employee.id); selectedEmpName.textContent = employee.name; selectedEmpId.textContent = employee.employeeNo; employeeInfoDisplay.classList.remove('d-none'); // Lock to preselected employee from Registration list
+            enrollEmployee.disabled = true;
+            const isEnrolled = enrolledIds.includes(String(employee.id));
+            if(isEnrolled){
+                // Show enrolled warning
+                const warn = document.createElement('div');
+                warn.id = 'enrolled-warning';
+                warn.className = 'alert alert-warning mt-2';
+                warn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Already enrolled — re-enrolling will overwrite existing fingerprint for <strong>'+employee.name+'</strong> ('+employee.employeeNo+').';
+                employeeInfoDisplay.appendChild(warn);
+                updateStatus('waiting','Ready to Re-enroll','This employee already has a fingerprint. Click Start Enrollment to overwrite.');
+            } else {
+                updateStatus('waiting','Ready to Enroll','Employee auto-selected from Registration. Click Start Enrollment.');
+            }
+            btnEnroll && btnEnroll.focus(); } else {
+                updateStatus('error','Employee Not Found','Employee '+preselectEmployeeId+' not found. Please select manually.');
+            } }
 
-        btnEnroll && btnEnroll.addEventListener('click', startEnrollment);
-        btnReset && btnReset.addEventListener('click', resetEnroll);
+        const reenrollModalEl = document.getElementById('reenrollConfirmModal');
+        const reenrollModal = reenrollModalEl ? new bootstrap.Modal(reenrollModalEl) : null;
+        const reenrollContinueBtn = document.getElementById('reenrollContinueBtn');
+        const reenrollConfirmEmployee = document.getElementById('reenrollConfirmEmployee');
+        if (reenrollContinueBtn) {
+            reenrollContinueBtn.addEventListener('click', function() {
+                if (reenrollModal) reenrollModal.hide();
+                setTimeout(() => startEnrollment(), 300);
+            });
+        }
 
-        enrollEmployee && enrollEmployee.addEventListener('change', function(){ const selectedEmployeeId = parseInt(this.value); const selectedEmployee = employeeDirectory.find(emp => String(emp.id) === String(selectedEmployeeId)); if(!selectedEmployee){ employeeInfoDisplay.classList.add('d-none'); return; } selectedEmpName.textContent = selectedEmployee.name; selectedEmpId.textContent = selectedEmployee.employeeNo; employeeInfoDisplay.classList.remove('d-none'); });
+        btnEnroll && btnEnroll.addEventListener('click', function(){
+            const selectedId = enrollEmployee.value;
+            if(selectedId && enrolledIds.includes(String(selectedId))){
+                const emp = employeeDirectory.find(e => String(e.id) === String(selectedId));
+                if (reenrollConfirmEmployee && emp) {
+                    reenrollConfirmEmployee.textContent = `${emp.name} (${emp.employeeNo})`;
+                } else if (reenrollConfirmEmployee) {
+                    reenrollConfirmEmployee.textContent = '';
+                }
+                if (reenrollModal) {
+                    reenrollModal.show();
+                } else {
+                    startEnrollment();
+                }
+                return;
+            }
+            startEnrollment();
+        });
+        btnReset && btnReset.addEventListener('click', function(){
+            // Unlock if was locked via URL preselect
+            if(preselectEmployeeId){ enrollEmployee.disabled = false; }
+            const w = document.getElementById('enrolled-warning');
+            if(w) w.remove();
+            resetEnroll();
+        });
+
+        enrollEmployee && enrollEmployee.addEventListener('change', function(){ const selectedEmployeeId = parseInt(this.value); const selectedEmployee = employeeDirectory.find(emp => String(emp.id) === String(selectedEmployeeId)); if(!selectedEmployee){ employeeInfoDisplay.classList.add('d-none'); return; } selectedEmpName.textContent = selectedEmployee.name; selectedEmpId.textContent = selectedEmployee.employeeNo; employeeInfoDisplay.classList.remove('d-none'); const isEnrolled = enrolledIds.includes(String(selectedEmployee.id)); const existingWarn = document.getElementById('enrolled-warning'); if(existingWarn) existingWarn.remove(); if(isEnrolled){ const warn = document.createElement('div'); warn.id = 'enrolled-warning'; warn.className = 'alert alert-warning mt-2'; warn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Already enrolled — re-enrolling will overwrite.'; employeeInfoDisplay.appendChild(warn); } });
     });
 </script>
-@endsection
-
 @endsection

@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Schedule;
 use App\Models\Employee;
-use App\Models\Student;
 
 class ScheduleController extends Controller
 {
@@ -22,24 +21,16 @@ class ScheduleController extends Controller
     }
 
     /**
-     * Check overlapping schedules for the same user.
+     * Check overlapping schedules for the same employee (faculty).
      */
     private function findScheduleConflict(
-        string $userType,
         ?int $employeeId,
-        ?int $studentId,
         array $days,
         string $startTime,
         string $endTime,
         ?Schedule $excludeSchedule = null
     ): ?string {
-        $query = Schedule::query()->where('user_type', $userType);
-
-        if ($userType === 'employee') {
-            $query->where('employee_id', $employeeId);
-        } else {
-            $query->where('student_id', $studentId);
-        }
+        $query = Schedule::query()->where('employee_id', $employeeId);
 
         $existingSchedules = $query->get();
         $inputStart = $this->toMinutes($startTime);
@@ -55,7 +46,6 @@ class ScheduleController extends Controller
                     !$excludeSchedule->schedule_group_key
                     && !$existingSchedule->schedule_group_key
                     && $existingSchedule->employee_id == $excludeSchedule->employee_id
-                    && $existingSchedule->student_id == $excludeSchedule->student_id
                     && $existingSchedule->start_time == $excludeSchedule->start_time
                     && $existingSchedule->end_time == $excludeSchedule->end_time
                 ) {
@@ -87,15 +77,14 @@ class ScheduleController extends Controller
     }
 
     /**
-     * Display schedule management page
+     * Display schedule management page for Employees/Faculty
      */
     public function index(Request $request)
     {
         $filterEmployeeId = $request->query('employee_id');
         
-        $query = Schedule::with(['employee', 'student'])
-            ->orderBy('employee_id')
-            ->orderBy('student_id');
+        $query = Schedule::with('employee')
+            ->orderBy('employee_id');
         
         // Apply filter if employee_id is provided
         if ($filterEmployeeId) {
@@ -111,7 +100,7 @@ class ScheduleController extends Controller
 
             $personKey = $schedule->employee_id
                 ? 'employee_' . $schedule->employee_id
-                : ($schedule->student_id ? 'student_' . $schedule->student_id : 'template_' . $schedule->start_time . '_' . $schedule->end_time);
+                : 'template_' . $schedule->start_time . '_' . $schedule->end_time;
 
             return $personKey . '_' . $schedule->start_time . '_' . $schedule->end_time;
         })->map(function($group) {
@@ -124,11 +113,9 @@ class ScheduleController extends Controller
             
             return (object)[
                 'ids' => $group->pluck('id')->toArray(),
-                'user_type' => $first->user_type,
+                'user_type' => $first->user_type ?? 'employee',
                 'employee' => $first->employee,
-                'student' => $first->student,
                 'employee_id' => $first->employee_id,
-                'student_id' => $first->student_id,
                 'days' => $days,
                 'days_display' => $this->formatDays($days),
                 'start_time' => $first->start_time,
@@ -137,7 +124,6 @@ class ScheduleController extends Controller
         })->values();
 
         $employees = Employee::all();
-        $students = Student::all();
         
         // Get the filtered employee if one is selected
         $filteredEmployee = $filterEmployeeId ? Employee::find($filterEmployeeId) : null;
@@ -145,7 +131,6 @@ class ScheduleController extends Controller
         return view('schedule.index', [
             'schedules' => $groupedSchedules,
             'employees' => $employees,
-            'students' => $students,
             'filterEmployeeId' => $filterEmployeeId,
             'filteredEmployee' => $filteredEmployee,
         ]);
@@ -188,20 +173,17 @@ class ScheduleController extends Controller
     }
 
     /**
-     * Store a new schedule
+     * Store a new schedule for Employee/Faculty
      */
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'user_type' => 'required|in:employee,student',
-            'employee_id' => 'nullable|required_if:user_type,employee|exists:employees,id',
-            'student_id' => 'nullable|required_if:user_type,student|exists:students,id',
+            'employee_id' => 'required|exists:employees,id',
             'schedule_days' => 'required|array|min:1',
             'schedule_start_time' => 'required|date_format:H:i',
             'schedule_end_time' => 'required|date_format:H:i',
         ]);
 
-        $userType = $validated['user_type'];
         $days = Schedule::normalizeDays($validated['schedule_days']);
         $startTime = $validated['schedule_start_time'];
         $endTime = $validated['schedule_end_time'];
@@ -211,9 +193,7 @@ class ScheduleController extends Controller
         }
 
         $conflictMessage = $this->findScheduleConflict(
-            $userType,
-            $validated['employee_id'] ?? null,
-            $validated['student_id'] ?? null,
+            $validated['employee_id'],
             $days,
             $startTime,
             $endTime
@@ -224,9 +204,9 @@ class ScheduleController extends Controller
         }
 
         $groupKey = Schedule::buildGroupKey(
-            $userType,
-            $validated['employee_id'] ?? null,
-            $validated['student_id'] ?? null,
+            'employee',
+            $validated['employee_id'],
+            null,
             $days,
             $startTime,
             $endTime
@@ -235,9 +215,8 @@ class ScheduleController extends Controller
         Schedule::updateOrCreate(
             ['schedule_group_key' => $groupKey],
             [
-                'employee_id' => $userType === 'employee' ? $validated['employee_id'] : null,
-                'student_id' => $userType === 'student' ? $validated['student_id'] : null,
-                'user_type' => $userType,
+                'employee_id' => $validated['employee_id'],
+                'user_type' => 'employee',
                 'day_of_week' => $days[0],
                 'schedule_days' => $days,
                 'start_time' => $startTime,
@@ -249,14 +228,12 @@ class ScheduleController extends Controller
     }
 
     /**
-     * Update schedule
+     * Update schedule for Employee/Faculty
      */
     public function update(Request $request, $id)
     {
         $validated = $request->validate([
-            'user_type' => 'required|in:employee,student',
-            'employee_id' => 'nullable|required_if:user_type,employee|exists:employees,id',
-            'student_id' => 'nullable|required_if:user_type,student|exists:students,id',
+            'employee_id' => 'required|exists:employees,id',
             'schedule_days' => 'required|array|min:1',
             'schedule_start_time' => 'required|date_format:H:i',
             'schedule_end_time' => 'required|date_format:H:i',
@@ -264,7 +241,6 @@ class ScheduleController extends Controller
 
         $schedule = Schedule::findOrFail($id);
 
-        $userType = $validated['user_type'];
         $days = Schedule::normalizeDays($validated['schedule_days']);
         $startTime = $validated['schedule_start_time'];
         $endTime = $validated['schedule_end_time'];
@@ -274,9 +250,7 @@ class ScheduleController extends Controller
         }
 
         $conflictMessage = $this->findScheduleConflict(
-            $userType,
-            $validated['employee_id'] ?? null,
-            $validated['student_id'] ?? null,
+            $validated['employee_id'],
             $days,
             $startTime,
             $endTime,
@@ -288,9 +262,9 @@ class ScheduleController extends Controller
         }
 
         $groupKey = Schedule::buildGroupKey(
-            $userType,
-            $validated['employee_id'] ?? null,
-            $validated['student_id'] ?? null,
+            'employee',
+            $validated['employee_id'],
+            null,
             $days,
             $startTime,
             $endTime
@@ -306,9 +280,8 @@ class ScheduleController extends Controller
             }
 
             $schedule->update([
-                'employee_id' => $userType === 'employee' ? $validated['employee_id'] : null,
-                'student_id' => $userType === 'student' ? $validated['student_id'] : null,
-                'user_type' => $userType,
+                'employee_id' => $validated['employee_id'],
+                'user_type' => 'employee',
                 'day_of_week' => $days[0],
                 'schedule_days' => $days,
                 'schedule_group_key' => $groupKey,
@@ -317,7 +290,6 @@ class ScheduleController extends Controller
             ]);
         } else {
             Schedule::where('employee_id', $schedule->employee_id)
-                ->where('student_id', $schedule->student_id)
                 ->where('start_time', $schedule->start_time)
                 ->where('end_time', $schedule->end_time)
                 ->delete();
@@ -325,9 +297,8 @@ class ScheduleController extends Controller
             Schedule::updateOrCreate(
                 ['schedule_group_key' => $groupKey],
                 [
-                    'employee_id' => $userType === 'employee' ? $validated['employee_id'] : null,
-                    'student_id' => $userType === 'student' ? $validated['student_id'] : null,
-                    'user_type' => $userType,
+                    'employee_id' => $validated['employee_id'],
+                    'user_type' => 'employee',
                     'day_of_week' => $days[0],
                     'schedule_days' => $days,
                     'start_time' => $startTime,
@@ -350,7 +321,6 @@ class ScheduleController extends Controller
             $schedule->delete();
         } else {
             Schedule::where('employee_id', $schedule->employee_id)
-                ->where('student_id', $schedule->student_id)
                 ->where('start_time', $schedule->start_time)
                 ->where('end_time', $schedule->end_time)
                 ->delete();
@@ -359,4 +329,3 @@ class ScheduleController extends Controller
         return redirect()->route('schedule.index')->with('success', 'Schedule deleted successfully');
     }
 }
-

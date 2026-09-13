@@ -217,34 +217,72 @@ class DatabaseService {
         return record.time_out_4 || record.time_out_3 || record.time_out_2 || record.time_out || null;
     }
 
-    static async getEmployeeScheduleForDate(employeeId, dateObj) {
+    /**
+     * Strict check: does employee have a schedule for the given date's weekday?
+     * Respects both legacy day_of_week and new schedule_days JSON, no fallback.
+     */
+    static async hasScheduleForDate(employeeId, dateObj) {
         const dayName = this.getDayName(dateObj);
-
-        const directDayRows = await this.query(
-            `SELECT id, employee_id, day_of_week, start_time, end_time
+        const rows = await this.query(
+            `SELECT id, day_of_week, schedule_days, schedule_group_key, start_time, end_time
              FROM employee_schedules
              WHERE employee_id = ?
-               AND day_of_week = ?
-             ORDER BY start_time ASC
-             LIMIT 1`,
-            [employeeId, dayName]
-        );
-
-        if (directDayRows.length > 0) {
-            return directDayRows[0];
-        }
-
-        // Fallback to generic employee schedule when day-specific rows are not present.
-        const fallbackRows = await this.query(
-            `SELECT id, employee_id, day_of_week, start_time, end_time
-             FROM employee_schedules
-             WHERE employee_id = ?
-             ORDER BY start_time ASC
-             LIMIT 1`,
+               AND (user_type = 'employee' OR user_type IS NULL)`,
             [employeeId]
         );
 
-        return fallbackRows[0] || null;
+        for (const row of rows) {
+            let days = [];
+            if (row.schedule_days) {
+                try {
+                    const parsed = typeof row.schedule_days === 'string' ? JSON.parse(row.schedule_days) : row.schedule_days;
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        days = parsed;
+                    }
+                } catch (e) {
+                    days = [];
+                }
+            }
+            if (days.length === 0 && row.day_of_week) {
+                days = [row.day_of_week];
+            }
+            // Normalize comparison
+            if (days.includes(dayName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static async getEmployeeScheduleForDate(employeeId, dateObj) {
+        const dayName = this.getDayName(dateObj);
+
+        // Try strict day match first (including schedule_days JSON)
+        const allRows = await this.query(
+            `SELECT id, employee_id, day_of_week, schedule_days, start_time, end_time
+             FROM employee_schedules
+             WHERE employee_id = ?
+               AND (user_type = 'employee' OR user_type IS NULL)
+             ORDER BY start_time ASC`,
+            [employeeId]
+        );
+
+        for (const row of allRows) {
+            let days = [];
+            if (row.schedule_days) {
+                try {
+                    const parsed = typeof row.schedule_days === 'string' ? JSON.parse(row.schedule_days) : row.schedule_days;
+                    if (Array.isArray(parsed) && parsed.length > 0) days = parsed;
+                } catch (e) {}
+            }
+            if (days.length === 0 && row.day_of_week) days = [row.day_of_week];
+            if (days.includes(dayName)) {
+                return row;
+            }
+        }
+
+        // No schedule for this weekday -> return null (strict, no generic fallback for validation)
+        return null;
     }
 
     static evaluateTimeInStatus(schedule, scanDate, dateString) {
@@ -346,6 +384,20 @@ class DatabaseService {
         const now = new Date();
         const today = this.formatDateLocal(now);
         const schedule = await this.getEmployeeScheduleForDate(employeeId, now);
+
+        // Schedule validation: reject if employee has no schedule for today (dynamic date, not hardcoded)
+        if (!schedule) {
+            const dayName = this.getDayName(now);
+            return {
+                action: 'no_schedule',
+                message: `Attendance rejected — no schedule for today (${dayName}, ${today}).`,
+                recordId: null,
+                status: null,
+                evaluation: null,
+                schedule_valid: false,
+            };
+        }
+
         const timeInDecision = this.evaluateTimeInStatus(schedule, now, today);
         
         // Check if attendance record exists for today

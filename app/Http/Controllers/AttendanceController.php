@@ -3,8 +3,6 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Student;
-use App\Models\StudentAttendance;
 use App\Models\Employee;
 use App\Models\EmployeeAttendance;
 use App\Models\Visitor;
@@ -12,74 +10,35 @@ use App\Models\Visitor;
 class AttendanceController extends Controller
 {
     /**
-     * Show unique student list
-     */
-    public function studentAttendance(Request $request)
-    {
-        // Get unique students with their latest attendance
-        $query = Student::query();
-
-        // Filter by course
-        if ($request->filled('course') && $request->course !== 'all') {
-            $query->where('course', $request->course);
-        }
-
-        // Get students with pagination
-        $students = $query->withCount('attendances')
-            ->paginate(15);
-
-        // Get unique courses for the dropdown
-        $courses = Student::distinct()
-            ->pluck('course')
-            ->filter()
-            ->sort()
-            ->values();
-
-        return view('attendance.student', [
-            'students' => $students,
-            'courses' => $courses,
-            'filters' => $request->only(['course']),
-        ]);
-    }
-
-    /**
-     * Show student attendance calendar
-     */
-    public function studentCalendar($studentId)
-    {
-        $student = Student::findOrFail($studentId);
-        $attendances = StudentAttendance::where('student_id', $studentId)
-            ->orderBy('date', 'desc')
-            ->get();
-
-        // Group by month for calendar view
-        $attendancesByMonth = $attendances->groupBy(function ($date) {
-            return $date->date->format('Y-m');
-        });
-
-        return view('attendance.student-calendar', [
-            'student' => $student,
-            'attendances' => $attendances,
-            'attendancesByMonth' => $attendancesByMonth,
-        ]);
-    }
-
-    /**
-     * Show employee attendance records
+     * Show employee attendance report grouped by employee
      */
     public function employeeAttendance(Request $request)
     {
-        // Get unique employees with their attendance count
-        $query = Employee::query();
+        // On initial page load (no filters submitted) show only the Filters section.
+        $hasFilters = $request->hasAny(['department', 'employee', 'date_from', 'date_to']);
 
-        // Filter by department
-        if ($request->filled('department') && $request->department !== 'all') {
-            $query->where('department', $request->department);
+        $employees = null;
+
+        if ($hasFilters) {
+            // Eager-load ALL attendances within the date range for each employee.
+            // Records are never paginated so an employee's table is always complete.
+            $dateFrom = $request->filled('date_from') ? $request->date_from : null;
+            $dateTo = $request->filled('date_to') ? $request->date_to : null;
+
+            $employees = $this->buildEmployeeAttendanceQuery($request)
+                ->with(['attendances' => function ($query) use ($dateFrom, $dateTo) {
+                    if ($dateFrom) {
+                        $query->whereDate('date', '>=', $dateFrom);
+                    }
+                    if ($dateTo) {
+                        $query->whereDate('date', '<=', $dateTo);
+                    }
+                    $query->orderBy('date', 'asc');
+                }])
+                ->orderBy('last_name')
+                ->orderBy('first_name')
+                ->paginate(15);
         }
-
-        // Get employees with pagination
-        $employees = $query->withCount('attendances')
-            ->paginate(15);
 
         // Get unique departments for the dropdown
         $departments = Employee::distinct()
@@ -91,8 +50,84 @@ class AttendanceController extends Controller
         return view('attendance.employee', [
             'employees' => $employees,
             'departments' => $departments,
-            'filters' => $request->only(['department']),
+            'filters' => $this->resolveFilters($request),
         ]);
+    }
+
+    /**
+     * Printable employee attendance report (browser print / Save as PDF)
+     */
+    public function employeeAttendancePrint(Request $request)
+    {
+        $dateFrom = $request->filled('date_from') ? $request->date_from : null;
+        $dateTo = $request->filled('date_to') ? $request->date_to : null;
+
+        $employees = $this->buildEmployeeAttendanceQuery($request)
+            ->with(['attendances' => function ($query) use ($dateFrom, $dateTo) {
+                if ($dateFrom) {
+                    $query->whereDate('date', '>=', $dateFrom);
+                }
+                if ($dateTo) {
+                    $query->whereDate('date', '<=', $dateTo);
+                }
+                $query->orderBy('date', 'asc');
+            }])
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
+
+        $departments = Employee::distinct()
+            ->pluck('department')
+            ->filter()
+            ->sort()
+            ->values();
+
+        return view('attendance.employee-print', [
+            'employees' => $employees,
+            'departments' => $departments,
+            'filters' => $this->resolveFilters($request),
+            'generatedAt' => now(),
+        ]);
+    }
+
+    /**
+     * Build the employee query applying department and name / employee no. filters.
+     */
+    private function buildEmployeeAttendanceQuery(Request $request)
+    {
+        $query = Employee::query();
+
+        if ($request->filled('department') && $request->department !== 'all') {
+            $query->where('department', $request->department);
+        }
+
+        $action = $request->input('action');
+
+        // Empty employee field = All Employees. The "All Employees" button
+        // (action=all) also ignores the employee text so name/number is cleared.
+        if ($request->filled('employee') && $action !== 'all') {
+            $searchTerm = trim($request->employee);
+            $query->where(function ($query) use ($searchTerm) {
+                $query->where('employee_id_number', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('first_name', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('last_name', 'like', '%' . $searchTerm . '%');
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * Resolve the filter values for display, clearing the employee field
+     * when the "All Employees" action was used.
+     */
+    private function resolveFilters(Request $request)
+    {
+        $filters = $request->only(['department', 'employee', 'date_from', 'date_to']);
+        if ($request->input('action') === 'all') {
+            $filters['employee'] = '';
+        }
+        return $filters;
     }
 
     /**
@@ -158,6 +193,7 @@ class AttendanceController extends Controller
     public function visitorLog(Request $request)
     {
         $query = Visitor::query();
+        $employees = Employee::orderBy('first_name')->orderBy('last_name')->get();
 
         // Filter by date range
         if ($request->filled('date_from')) {
@@ -187,6 +223,7 @@ class AttendanceController extends Controller
 
         return view('attendance.visitor', [
             'visitors' => $visitors,
+            'employees' => $employees,
             'filters' => $request->only(['date_from', 'date_to', 'purpose', 'status']),
         ]);
     }
@@ -259,40 +296,4 @@ class AttendanceController extends Controller
 
         return response()->stream($callback, 200, $headers);
     }
-
-    /**
-     * Add manual attendance for a student
-     */
-    public function addStudentAttendance(Request $request, $studentId)
-    {
-        $request->validate([
-            'date' => 'required|date',
-            'time_in' => 'nullable|date_format:H:i',
-            'time_out' => 'nullable|date_format:H:i',
-            'status' => 'required|in:present,late,absent,excused',
-        ]);
-
-        $student = Student::findOrFail($studentId);
-
-        // Check if attendance already exists for this date
-        $existingAttendance = StudentAttendance::where('student_id', $studentId)
-            ->whereDate('date', $request->date)
-            ->first();
-
-        if ($existingAttendance) {
-            return redirect()->back()->with('error', 'Attendance already exists for this date. Please edit the existing record.');
-        }
-
-        // Create attendance record
-        StudentAttendance::create([
-            'student_id' => $studentId,
-            'date' => $request->date,
-            'time_in' => $request->time_in ? $request->date . ' ' . $request->time_in . ':00' : null,
-            'time_out' => $request->time_out ? $request->date . ' ' . $request->time_out . ':00' : null,
-            'status' => $request->status,
-        ]);
-
-        return redirect()->back()->with('success', 'Attendance recorded successfully for ' . $student->full_name);
-    }
 }
-
