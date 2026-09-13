@@ -14,23 +14,31 @@ class AttendanceController extends Controller
      */
     public function employeeAttendance(Request $request)
     {
-        $dateFrom = $request->filled('date_from') ? $request->date_from : null;
-        $dateTo = $request->filled('date_to') ? $request->date_to : null;
+        // Show no records until Search (with a filter) or All Employees is clicked.
+        $hasFilters = $request->hasAny(['department', 'employee', 'date_from', 'date_to'])
+            || $request->filled('action');
 
-        $employees = $this->buildEmployeeAttendanceQuery($request)
-            ->with(['attendances' => function ($query) use ($dateFrom, $dateTo) {
-                if ($dateFrom) {
-                    $query->whereDate('date', '>=', $dateFrom);
-                }
-                if ($dateTo) {
-                    $query->whereDate('date', '<=', $dateTo);
-                }
-                $query->orderBy('date', 'asc');
-            }])
-            ->orderBy('last_name')
-            ->orderBy('first_name')
-            ->paginate(15)
-            ->withQueryString();
+        $employees = null;
+
+        if ($hasFilters) {
+            $dateFrom = $request->filled('date_from') ? $request->date_from : null;
+            $dateTo = $request->filled('date_to') ? $request->date_to : null;
+
+            $employees = $this->buildEmployeeAttendanceQuery($request)
+                ->with(['attendances' => function ($query) use ($dateFrom, $dateTo) {
+                    if ($dateFrom) {
+                        $query->whereDate('date', '>=', $dateFrom);
+                    }
+                    if ($dateTo) {
+                        $query->whereDate('date', '<=', $dateTo);
+                    }
+                    $query->orderBy('date', 'asc');
+                }])
+                ->orderBy('last_name')
+                ->orderBy('first_name')
+                ->paginate(15)
+                ->withQueryString();
+        }
 
         // Get unique departments for the dropdown
         $departments = Employee::distinct()
@@ -93,8 +101,11 @@ class AttendanceController extends Controller
             $query->where('department', $request->department);
         }
 
-        // Empty employee field = All Employees.
-        if ($request->filled('employee')) {
+        $action = $request->input('action');
+
+        // Empty employee field = All Employees. The "All Employees" button
+        // (action=all) also ignores the employee text so name/number is cleared.
+        if ($request->filled('employee') && $action !== 'all') {
             $searchTerm = trim($request->employee);
             $query->where(function ($query) use ($searchTerm) {
                 $query->where('employee_id_number', 'like', '%' . $searchTerm . '%')
@@ -106,9 +117,17 @@ class AttendanceController extends Controller
         return $query;
     }
 
+    /**
+     * Resolve the filter values for display, clearing the employee field
+     * when the "All Employees" action was used.
+     */
     private function resolveFilters(Request $request)
     {
-        return $request->only(['department', 'employee', 'date_from', 'date_to']);
+        $filters = $request->only(['department', 'employee', 'date_from', 'date_to']);
+        if ($request->input('action') === 'all') {
+            $filters['employee'] = '';
+        }
+        return $filters;
     }
 
     /**
