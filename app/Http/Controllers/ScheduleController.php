@@ -113,7 +113,6 @@ class ScheduleController extends Controller
             
             return (object)[
                 'ids' => $group->pluck('id')->toArray(),
-                'user_type' => $first->user_type ?? 'employee',
                 'employee' => $first->employee,
                 'employee_id' => $first->employee_id,
                 'days' => $days,
@@ -216,7 +215,6 @@ class ScheduleController extends Controller
             ['schedule_group_key' => $groupKey],
             [
                 'employee_id' => $validated['employee_id'],
-                'user_type' => 'employee',
                 'day_of_week' => $days[0],
                 'schedule_days' => $days,
                 'start_time' => $startTime,
@@ -281,7 +279,6 @@ class ScheduleController extends Controller
 
             $schedule->update([
                 'employee_id' => $validated['employee_id'],
-                'user_type' => 'employee',
                 'day_of_week' => $days[0],
                 'schedule_days' => $days,
                 'schedule_group_key' => $groupKey,
@@ -298,7 +295,6 @@ class ScheduleController extends Controller
                 ['schedule_group_key' => $groupKey],
                 [
                     'employee_id' => $validated['employee_id'],
-                    'user_type' => 'employee',
                     'day_of_week' => $days[0],
                     'schedule_days' => $days,
                     'start_time' => $startTime,

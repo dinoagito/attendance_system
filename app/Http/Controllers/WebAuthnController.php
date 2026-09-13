@@ -242,10 +242,7 @@ class WebAuthnController extends Controller
     private function hasScheduleForToday(int $employeeId): bool
     {
         $todayDay = Carbon::now()->format('l'); // Monday, Tuesday, etc. in Asia/Manila
-        $schedules = Schedule::where('employee_id', $employeeId)
-            ->where(function ($q) {
-                $q->where('user_type', 'employee')->orWhereNull('user_type');
-            })->get();
+        $schedules = Schedule::where('employee_id', $employeeId)->get();
 
         foreach ($schedules as $schedule) {
             $days = $schedule->days_list; // uses Schedule::normalizeDays + fallback

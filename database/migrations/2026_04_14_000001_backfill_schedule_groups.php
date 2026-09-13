@@ -21,15 +21,13 @@ return new class extends Migration
         ];
 
         $groups = DB::table('employee_schedules')
-            ->select('employee_id', 'student_id', 'user_type', 'start_time', 'end_time')
-            ->groupBy('employee_id', 'student_id', 'user_type', 'start_time', 'end_time')
+            ->select('employee_id', 'start_time', 'end_time')
+            ->groupBy('employee_id', 'start_time', 'end_time')
             ->get();
 
         foreach ($groups as $group) {
             $rows = DB::table('employee_schedules')
                 ->where('employee_id', $group->employee_id)
-                ->where('student_id', $group->student_id)
-                ->where('user_type', $group->user_type)
                 ->where('start_time', $group->start_time)
                 ->where('end_time', $group->end_time)
                 ->orderBy('id')
@@ -62,11 +60,7 @@ return new class extends Migration
                 continue;
             }
 
-            $identity = $group->user_type === 'employee'
-                ? 'employee:' . ($group->employee_id ?? 'null')
-                : ($group->user_type === 'student'
-                    ? 'student:' . ($group->student_id ?? 'null')
-                    : 'template:null');
+            $identity = 'employee:' . ($group->employee_id ?? 'null');
 
             $groupKey = sha1($identity . '|' . implode(',', $days) . '|' . $group->start_time . '|' . $group->end_time);
 

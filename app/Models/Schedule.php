@@ -10,7 +10,6 @@ class Schedule extends Model
 
     protected $fillable = [
         'employee_id',
-        'user_type',
         'name',
         'day_of_week',
         'schedule_days',

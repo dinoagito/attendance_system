@@ -226,8 +226,7 @@ class DatabaseService {
         const rows = await this.query(
             `SELECT id, day_of_week, schedule_days, schedule_group_key, start_time, end_time
              FROM employee_schedules
-             WHERE employee_id = ?
-               AND (user_type = 'employee' OR user_type IS NULL)`,
+             WHERE employee_id = ?`,
             [employeeId]
         );
 
@@ -262,7 +261,6 @@ class DatabaseService {
             `SELECT id, employee_id, day_of_week, schedule_days, start_time, end_time
              FROM employee_schedules
              WHERE employee_id = ?
-               AND (user_type = 'employee' OR user_type IS NULL)
              ORDER BY start_time ASC`,
             [employeeId]
         );

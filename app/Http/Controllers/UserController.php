@@ -154,7 +154,7 @@ class UserController extends Controller
         
         // Get schedule templates grouped by logical schedule group for Employees/Faculty
         $rawSchedules = Schedule::with('employee')
-            ->select('id', 'employee_id', 'user_type', 'day_of_week', 'schedule_days', 'schedule_group_key', 'start_time', 'end_time')
+            ->select('id', 'employee_id', 'day_of_week', 'schedule_days', 'schedule_group_key', 'start_time', 'end_time')
             ->orderBy('employee_id')
             ->get();
         
@@ -184,7 +184,6 @@ class UserController extends Controller
                 'start_time' => $first->start_time,
                 'end_time' => $first->end_time,
                 'employee' => $first->employee,
-                'user_type' => $first->user_type ?? 'employee',
             ];
         })->values();
 
@@ -262,7 +261,6 @@ class UserController extends Controller
                             ['schedule_group_key' => $groupKey],
                             [
                                 'employee_id' => $employee->id,
-                                'user_type' => 'employee',
                                 'day_of_week' => $days[0],
                                 'schedule_days' => $days,
                                 'start_time' => $scheduleTemplate->start_time,
