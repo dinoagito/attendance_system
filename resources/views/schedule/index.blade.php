@@ -92,7 +92,7 @@
                                             >
                                                 <i class="fas fa-edit"></i>
                                             </button>
-                                            <button class="action-btn delete" title="Delete" onclick="deleteSchedule({{ $schedule->ids[0] }})">
+                                            <button class="action-btn delete delete-schedule" title="Delete" data-id="{{ $schedule->ids[0] }}">
                                                 <i class="fas fa-trash"></i>
                                             </button>
                                         </div>
@@ -255,6 +255,27 @@
                     <button type="submit" class="btn btn-primary">Update Schedule</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Schedule Confirmation Modal — replaces native confirm() -->
+<div class="modal fade" id="deleteScheduleConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom:1px solid #e0e0e0;">
+                <h5 class="modal-title" style="color:#dc3545;"><i class="fas fa-exclamation-triangle" style="color:#dc3545;"></i> Delete Schedule?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="mb-3" style="font-size:52px;color:#dc3545;"><i class="fas fa-calendar-times"></i></div>
+                <p class="fs-5 mb-2" style="font-weight:600;color:#212529;">This schedule will be permanently deleted.</p>
+                <p class="text-muted small mb-0">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer justify-content-center gap-2">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteScheduleBtn" style="font-weight:600;"><i class="fas fa-trash"></i> Delete Schedule</button>
+            </div>
         </div>
     </div>
 </div>
@@ -487,18 +508,53 @@ function openEditSchedule(button) {
     bootstrap.Modal.getOrCreateInstance(document.getElementById('editScheduleModal')).show();
 }
 
+let pendingDeleteScheduleId = null;
+
+function submitDeleteSchedule(scheduleId) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/schedule/' + scheduleId;
+    form.innerHTML = '@csrf<input type="hidden" name="_method" value="DELETE">';
+    document.body.appendChild(form);
+    form.submit();
+}
+
 function deleteSchedule(scheduleId) {
-    if (confirm('Are you sure you want to delete this schedule?')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/schedule/' + scheduleId;
-        form.innerHTML = '@csrf @method("DELETE")';
-        document.body.appendChild(form);
-        form.submit();
+    pendingDeleteScheduleId = scheduleId;
+    const modalEl = document.getElementById('deleteScheduleConfirmModal');
+    if (modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Delete confirmation modal — replaces native confirm() with Bootstrap modal
+    const deleteScheduleModalEl = document.getElementById('deleteScheduleConfirmModal');
+    const deleteScheduleModal = deleteScheduleModalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal ? new bootstrap.Modal(deleteScheduleModalEl) : null;
+    const confirmDeleteScheduleBtn = document.getElementById('confirmDeleteScheduleBtn');
+
+    document.querySelectorAll('.delete-schedule').forEach(btn => {
+        btn.addEventListener('click', function() {
+            pendingDeleteScheduleId = this.dataset.id;
+            if (deleteScheduleModal) deleteScheduleModal.show();
+        });
+    });
+
+    if (confirmDeleteScheduleBtn) {
+        confirmDeleteScheduleBtn.addEventListener('click', function() {
+            if (deleteScheduleModal) deleteScheduleModal.hide();
+            setTimeout(function() {
+                if (pendingDeleteScheduleId) submitDeleteSchedule(pendingDeleteScheduleId);
+            }, 300);
+        });
+    }
+
+    if (deleteScheduleModalEl) {
+        deleteScheduleModalEl.addEventListener('hidden.bs.modal', function() {
+            pendingDeleteScheduleId = null;
+        });
+    }
+
     const addFormElements = [
         document.getElementById('addStartTime'),
         document.getElementById('addEndTime')
