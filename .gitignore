@@ -32,3 +32,8 @@ Thumbs.db
 .env.local.backup
 railway_data.sql
 railway_data_sanitized.sql
+
+# Local offline migration backups — never commit (credentials/dumps)
+.env.railway.backup
+fingerprint-server/.env.railway.backup
+attendance_app_local_backup*.sql

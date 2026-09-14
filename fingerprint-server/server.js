@@ -57,8 +57,7 @@ const wss = new WebSocket.Server({ server, path: '/ws' });
 // Middleware
 const defaultOrigins = [
     'http://localhost:8000',
-    'http://127.0.0.1:8000',
-    'https://attendancesystem-production-e301.up.railway.app'
+    'http://127.0.0.1:8000'
 ];
 const configuredOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
