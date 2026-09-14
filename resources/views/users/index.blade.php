@@ -155,7 +155,7 @@
                                                     @csrf
                                                     @method('DELETE')
                                                     <input type="hidden" name="user_type" value="employee">
-                                                    <button type="submit" class="action-btn delete" title="Delete">
+                                                    <button type="submit" class="action-btn delete" title="Delete" data-status="{{ $employee->status }}">
                                                         <i class="fas fa-trash"></i>
                                                     </button>
                                                 </form>
@@ -597,6 +597,27 @@
         </div>
     </div>
 </div>
+
+<!-- Active Employee Delete Blocked Modal -->
+<div class="modal fade" id="activeBlockedModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom:1px solid #e0e0e0;">
+                <h5 class="modal-title" style="color:#dc3545;"><i class="fas fa-ban" style="color:#dc3545;"></i> Cannot Delete Active Employee</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="mb-3" style="font-size:52px;color:#dc3545;"><i class="fas fa-user-slash"></i></div>
+                <p class="fs-5 mb-2" style="font-weight:600;color:#212529;">This employee is still Active.</p>
+                <p class="text-muted mb-1" id="blockedEmployeeName" style="font-weight:500;"></p>
+                <p class="text-muted small mb-0">Deletion is blocked while status is Active. Please change the employee status to <strong>Inactive</strong> first, then try again.</p>
+            </div>
+            <div class="modal-footer justify-content-center gap-2">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @section('scripts')
@@ -655,6 +676,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let pendingDeleteForm = null;
     const deleteModalEl = document.getElementById('deleteConfirmModal');
     const deleteModal = deleteModalEl ? new bootstrap.Modal(deleteModalEl) : null;
+    const blockedModalEl = document.getElementById('activeBlockedModal');
+    const blockedModal = blockedModalEl ? new bootstrap.Modal(blockedModalEl) : null;
+    const blockedNameEl = document.getElementById('blockedEmployeeName');
     const deleteTitle = document.getElementById('deleteConfirmTitle');
     const deleteHeading = document.getElementById('deleteConfirmHeading');
     const deleteNameEl = document.getElementById('deleteConfirmName');
@@ -666,10 +690,18 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!form) return;
         form.addEventListener('submit', function(e) {
             e.preventDefault();
-            pendingDeleteForm = form;
             const isVisitor = !!form.querySelector('input[name="user_type"][value="visitor"]');
+            const status = btn.dataset.status || '';
+            const isActive = !isVisitor && status === 'active';
             const row = form.closest('tr');
             const name = row ? (row.querySelector('td strong')?.textContent?.trim() || '') : '';
+            if (isActive) {
+                if (blockedNameEl) blockedNameEl.textContent = name ? '"' + name + '"' : '';
+                if (blockedModal) blockedModal.show();
+                else alert('Cannot delete an active employee. Set status to inactive first.');
+                return;
+            }
+            pendingDeleteForm = form;
             if (deleteTitle) {
                 deleteTitle.innerHTML = isVisitor
                     ? '<i class="fas fa-exclamation-triangle" style="color:#dc3545;"></i> Delete Visitor?'
