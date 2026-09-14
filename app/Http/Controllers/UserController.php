@@ -58,8 +58,7 @@ class UserController extends Controller
                 $q->where('first_name', 'like', "%{$keyword}%")
                     ->orWhere('last_name', 'like', "%{$keyword}%")
                     ->orWhere('employee_id_number', 'like', "%{$keyword}%")
-                    ->orWhere('department', 'like', "%{$keyword}%")
-                    ->orWhere('email', 'like', "%{$keyword}%");
+                    ->orWhere('department', 'like', "%{$keyword}%");
             });
         }
 
@@ -231,8 +230,6 @@ class UserController extends Controller
                 'first_name' => 'required|string',
                 'last_name' => 'required|string',
                 'department' => 'nullable|string',
-                'email' => 'nullable|email|unique:employees',
-                'phone' => 'nullable|string',
                 'status' => 'required|in:active,inactive',
                 'schedule_id' => 'nullable|exists:employee_schedules,id',
             ]);
@@ -306,8 +303,6 @@ class UserController extends Controller
                 'first_name' => 'required|string',
                 'last_name' => 'required|string',
                 'department' => 'nullable|string',
-                'email' => 'nullable|email|unique:employees,email,' . $id,
-                'phone' => 'nullable|string',
                 'status' => 'required|in:active,inactive',
             ]);
 

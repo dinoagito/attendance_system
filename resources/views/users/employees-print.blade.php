@@ -78,8 +78,6 @@
                 <th>Name</th>
                 <th>Employee ID</th>
                 <th>Department</th>
-                <th>Email</th>
-                <th>Phone</th>
                 <th>Status</th>
             </tr>
         </thead>
@@ -89,15 +87,13 @@
                     <td>{{ $employee->full_name }}</td>
                     <td>{{ $employee->employee_id_number }}</td>
                     <td>{{ $employee->department ?? '-' }}</td>
-                    <td>{{ $employee->email ?? '-' }}</td>
-                    <td>{{ $employee->phone ?? '-' }}</td>
                     <td class="status-{{ $employee->status === 'inactive' ? 'inactive' : 'active' }}">
                         {{ ucfirst($employee->status ?? 'active') }}
                     </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6" style="text-align: center;">No employees found.</td>
+                    <td colspan="4" style="text-align: center;">No employees found.</td>
                 </tr>
             @endforelse
         </tbody>

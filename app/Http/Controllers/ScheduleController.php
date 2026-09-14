@@ -77,21 +77,27 @@ class ScheduleController extends Controller
     }
 
     /**
-     * Display schedule management page for Employees/Faculty
+     * Display schedule management page for Employees/Faculty - strictly employee-specific.
+     * Requires valid employee_id query param; otherwise redirects to Employee Management.
      */
     public function index(Request $request)
     {
         $filterEmployeeId = $request->query('employee_id');
-        
-        $query = Schedule::with('employee')
-            ->orderBy('employee_id');
-        
-        // Apply filter if employee_id is provided
-        if ($filterEmployeeId) {
-            $query->where('employee_id', $filterEmployeeId);
+
+        // Strict scoping: employee_id is required and must be valid
+        if (!$filterEmployeeId || !ctype_digit((string) $filterEmployeeId)) {
+            return redirect()->route('users.index')->with('error', 'Please select an employee from Employee Management to view their schedules.');
         }
-        
-        $schedules = $query->get();
+
+        $filteredEmployee = Employee::find($filterEmployeeId);
+        if (!$filteredEmployee) {
+            return redirect()->route('users.index')->with('error', 'Selected employee not found.');
+        }
+
+        $schedules = Schedule::with('employee')
+            ->where('employee_id', $filterEmployeeId)
+            ->orderBy('employee_id')
+            ->get();
         
         $groupedSchedules = $schedules->groupBy(function ($schedule) {
             if ($schedule->schedule_group_key) {
@@ -122,15 +128,9 @@ class ScheduleController extends Controller
             ];
         })->values();
 
-        $employees = Employee::all();
-        
-        // Get the filtered employee if one is selected
-        $filteredEmployee = $filterEmployeeId ? Employee::find($filterEmployeeId) : null;
-
         return view('schedule.index', [
             'schedules' => $groupedSchedules,
-            'employees' => $employees,
-            'filterEmployeeId' => $filterEmployeeId,
+            'filterEmployeeId' => (int) $filterEmployeeId,
             'filteredEmployee' => $filteredEmployee,
         ]);
     }
@@ -172,7 +172,7 @@ class ScheduleController extends Controller
     }
 
     /**
-     * Store a new schedule for Employee/Faculty
+     * Store a new schedule for Employee/Faculty - strictly scoped, appends to existing.
      */
     public function store(Request $request)
     {
@@ -183,12 +183,18 @@ class ScheduleController extends Controller
             'schedule_end_time' => 'required|date_format:H:i',
         ]);
 
+        // Backend enforcement: employee scope is source of truth; validate exists
+        $employee = Employee::find($validated['employee_id']);
+        if (!$employee) {
+            return redirect()->route('users.index')->with('error', 'Selected employee not found.')->withInput();
+        }
+
         $days = Schedule::normalizeDays($validated['schedule_days']);
         $startTime = $validated['schedule_start_time'];
         $endTime = $validated['schedule_end_time'];
 
         if ($this->toMinutes($endTime) <= $this->toMinutes($startTime)) {
-            return redirect()->back()->with('error', 'Time Out must be later than Time In.')->withInput();
+            return redirect()->route('schedule.index', ['employee_id' => $validated['employee_id']])->with('error', 'Time Out must be later than Time In.')->withInput();
         }
 
         $conflictMessage = $this->findScheduleConflict(
@@ -199,7 +205,7 @@ class ScheduleController extends Controller
         );
 
         if ($conflictMessage) {
-            return redirect()->back()->with('error', $conflictMessage)->withInput();
+            return redirect()->route('schedule.index', ['employee_id' => $validated['employee_id']])->with('error', $conflictMessage)->withInput();
         }
 
         $groupKey = Schedule::buildGroupKey(
@@ -222,14 +228,16 @@ class ScheduleController extends Controller
             ]
         );
 
-        return redirect()->route('schedule.index')->with('success', 'Schedule created successfully');
+        return redirect()->route('schedule.index', ['employee_id' => $validated['employee_id']])->with('success', 'Schedule created successfully');
     }
 
     /**
-     * Update schedule for Employee/Faculty
+     * Update schedule for Employee/Faculty - locked to current employee.
      */
     public function update(Request $request, $id)
     {
+        $schedule = Schedule::findOrFail($id);
+
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'schedule_days' => 'required|array|min:1',
@@ -237,14 +245,17 @@ class ScheduleController extends Controller
             'schedule_end_time' => 'required|date_format:H:i',
         ]);
 
-        $schedule = Schedule::findOrFail($id);
+        // Backend enforcement: lock to current employee - prevent moving schedule to another employee
+        if ((int) $validated['employee_id'] !== (int) $schedule->employee_id) {
+            return redirect()->route('schedule.index', ['employee_id' => $schedule->employee_id])->with('error', 'Cannot change employee for this schedule. The schedule is locked to its current employee.')->withInput();
+        }
 
         $days = Schedule::normalizeDays($validated['schedule_days']);
         $startTime = $validated['schedule_start_time'];
         $endTime = $validated['schedule_end_time'];
 
         if ($this->toMinutes($endTime) <= $this->toMinutes($startTime)) {
-            return redirect()->back()->with('error', 'Time Out must be later than Time In.')->withInput();
+            return redirect()->route('schedule.index', ['employee_id' => $schedule->employee_id])->with('error', 'Time Out must be later than Time In.')->withInput();
         }
 
         $conflictMessage = $this->findScheduleConflict(
@@ -256,7 +267,7 @@ class ScheduleController extends Controller
         );
 
         if ($conflictMessage) {
-            return redirect()->back()->with('error', $conflictMessage)->withInput();
+            return redirect()->route('schedule.index', ['employee_id' => $schedule->employee_id])->with('error', $conflictMessage)->withInput();
         }
 
         $groupKey = Schedule::buildGroupKey(
@@ -274,7 +285,7 @@ class ScheduleController extends Controller
                 ->exists();
 
             if ($conflict) {
-                return redirect()->back()->with('error', 'A schedule with the same user, days, and time already exists.');
+                return redirect()->route('schedule.index', ['employee_id' => $schedule->employee_id])->with('error', 'A schedule with the same user, days, and time already exists.');
             }
 
             $schedule->update([
@@ -303,15 +314,16 @@ class ScheduleController extends Controller
             );
         }
 
-        return redirect()->route('schedule.index')->with('success', 'Schedule updated successfully');
+        return redirect()->route('schedule.index', ['employee_id' => $schedule->employee_id])->with('success', 'Schedule updated successfully');
     }
 
     /**
-     * Delete schedule (deletes all days for the same person/time)
+     * Delete schedule (deletes all days for the same person/time) - scoped redirect
      */
     public function destroy(Request $request, $id)
     {
         $schedule = Schedule::findOrFail($id);
+        $employeeId = $schedule->employee_id;
 
         if ($schedule->schedule_group_key) {
             $schedule->delete();
@@ -322,6 +334,6 @@ class ScheduleController extends Controller
                 ->delete();
         }
             
-        return redirect()->route('schedule.index')->with('success', 'Schedule deleted successfully');
+        return redirect()->route('schedule.index', ['employee_id' => $employeeId])->with('success', 'Schedule deleted successfully');
     }
 }

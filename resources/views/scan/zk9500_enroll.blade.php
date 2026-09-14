@@ -61,6 +61,10 @@
                         <i class="fas fa-redo-alt"></i> Reset
                     </button>
                 </div>
+                <!-- Back button below fingerprint scanning section - returns to Employee Management, preserves context -->
+                <a href="{{ $validatedReturnUrl ?? route('users.index') }}" class="btn btn-secondary w-100 mt-3" style="padding:10px 18px; border-radius:8px; font-weight:500;">
+                    <i class="fas fa-arrow-left"></i> Back to Employee Management
+                </a>
             </div>
         </div>
 

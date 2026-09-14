@@ -131,7 +131,7 @@ class DatabaseService {
      */
     static async getEmployeeById(employeeId) {
         const sql = `
-            SELECT id, CONCAT(first_name, ' ', last_name) as name, employee_id_number as employee_id, department, department as position, email, phone
+            SELECT id, CONCAT(first_name, ' ', last_name) as name, employee_id_number as employee_id, department, department as position
             FROM employees
             WHERE id = ?
         `;

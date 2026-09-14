@@ -51,9 +51,9 @@ class WebAuthnController extends Controller
     }
 
     /**
-     * Show the dedicated ZK9500 enrollment page (admin only)
+     * Show the dedicated ZK9500 enrollment page (admin only) - with validated return_url for Back navigation.
      */
-    public function zk9500EnrollPage()
+    public function zk9500EnrollPage(Request $request)
     {
         $employees = Employee::orderBy('first_name')->orderBy('last_name')->get();
 
@@ -80,7 +80,31 @@ class WebAuthnController extends Controller
             $enrolledIds = [];
         }
 
-        return view('scan.zk9500_enroll', compact('employees', 'employeeDirectory', 'enrolledIds'));
+        // Validate return_url to prevent open redirect: only allow same-host relative or absolute same-host
+        $returnUrl = $request->query('return_url');
+        $validatedReturnUrl = null;
+        if ($returnUrl) {
+            $parsed = parse_url($returnUrl);
+            $isRelative = empty($parsed['host']) && isset($parsed['path']) && str_starts_with($parsed['path'], '/');
+            $isSameHost = isset($parsed['host']) && $parsed['host'] === $request->getHost();
+            // Allow relative URL or same-host absolute; also allow with query/fragment
+            if ($isRelative || $isSameHost) {
+                // Additional safety: must start with /users or /dashboard or /attendance etc? Allow any same-host app path
+                // Ensure no javascript: or data: scheme
+                $scheme = $parsed['scheme'] ?? null;
+                if (!$scheme || in_array($scheme, ['http', 'https'])) {
+                    $validatedReturnUrl = $returnUrl;
+                }
+            }
+            // Fallback to users index if validation fails
+            if (!$validatedReturnUrl) {
+                $validatedReturnUrl = route('users.index');
+            }
+        } else {
+            $validatedReturnUrl = route('users.index');
+        }
+
+        return view('scan.zk9500_enroll', compact('employees', 'employeeDirectory', 'enrolledIds', 'validatedReturnUrl'));
     }
 
     /**

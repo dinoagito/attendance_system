@@ -15,20 +15,11 @@
     </div>
 </div>
 
-<!-- Filter Alert Section -->
-@if($filterEmployeeId && $filteredEmployee)
-<div class="alert alert-info alert-dismissible fade show mb-4" role="alert">
-    <div class="d-flex justify-content-between align-items-center">
-        <div>
-            <strong><i class="fas fa-filter"></i> Filtered View:</strong> Showing schedules for 
-            <strong>{{ $filteredEmployee->full_name }}</strong> ({{ $filteredEmployee->employee_id_number }})
-        </div>
-        <a href="{{ route('schedule.index') }}" class="btn btn-sm btn-outline-primary">
-            <i class="fas fa-times"></i> Display All
-        </a>
-    </div>
+<!-- Employee-Specific Scope Alert (strictly filtered) -->
+<div class="alert alert-info mb-4" role="alert">
+    <strong><i class="fas fa-filter"></i> Employee-Specific View:</strong> Showing schedules for 
+    <strong>{{ $filteredEmployee->full_name }}</strong> ({{ $filteredEmployee->employee_id_number }})@if($filteredEmployee->department) - {{ $filteredEmployee->department }}@endif
 </div>
-@endif
 
 <div class="row mb-4">
     <div class="col-12">
@@ -44,11 +35,7 @@
         <div class="card">
             <div class="card-header">
                 <i class="fas fa-calendar"></i> Work Schedules
-                @if($filterEmployeeId)
-                    <span class="badge bg-info ms-2">{{ $schedules->count() }} schedule(s) for {{ $filteredEmployee->full_name }}</span>
-                @else
-                    <span class="badge bg-secondary ms-2">{{ $schedules->count() }} total schedule(s)</span>
-                @endif
+                <span class="badge bg-info ms-2">{{ $schedules->count() }} schedule(s) for {{ $filteredEmployee->full_name }}</span>
             </div>
             <div class="card-body">
                 <div class="table-container">
@@ -138,15 +125,17 @@
                 @csrf
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Select Employee / Faculty *</label>
-                        <input type="text" id="employeeSearch" class="form-control mb-2" placeholder="Search employee by name or ID">
-                        <select name="employee_id" id="employeeSelect" class="form-control @error('employee_id') is-invalid @enderror" required>
-                            <option value="">Select Employee / Faculty</option>
-                            @foreach($employees as $employee)
-                                <option value="{{ $employee->id }}">{{ $employee->full_name }} ({{ $employee->employee_id_number }}) - {{ $employee->department ?? 'No Department' }}</option>
-                            @endforeach
-                        </select>
-                        @error('employee_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        <label class="form-label">Assigned Employee *</label>
+                        <div class="alert alert-light border d-flex align-items-center gap-2 mb-0" style="background:#f8f9fa;">
+                            <i class="fas fa-user-circle text-success" style="font-size:1.4rem;"></i>
+                            <div>
+                                <div style="font-weight:600;">{{ $filteredEmployee->full_name }}</div>
+                                <small class="text-muted">{{ $filteredEmployee->employee_id_number }}@if($filteredEmployee->department) - {{ $filteredEmployee->department }}@endif</small>
+                            </div>
+                        </div>
+                        <input type="hidden" name="employee_id" id="employeeSelect" value="{{ $filteredEmployee->id }}">
+                        <small class="text-muted d-block mt-1">Schedule will be automatically assigned to this employee.</small>
+                        @error('employee_id') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                     </div>
 
                     <div class="mb-3">
@@ -216,14 +205,16 @@
                 <input type="hidden" id="editScheduleRecordId" value="">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Select Employee / Faculty *</label>
-                        <input type="text" id="editEmployeeSearch" class="form-control mb-2" placeholder="Search employee by name or ID">
-                        <select name="employee_id" id="editEmployeeSelect" class="form-control" required>
-                            <option value="">Select Employee / Faculty</option>
-                            @foreach($employees as $employee)
-                                <option value="{{ $employee->id }}">{{ $employee->full_name }} ({{ $employee->employee_id_number }})</option>
-                            @endforeach
-                        </select>
+                        <label class="form-label">Assigned Employee *</label>
+                        <div class="alert alert-light border d-flex align-items-center gap-2 mb-0" style="background:#f8f9fa;">
+                            <i class="fas fa-user-circle text-success" style="font-size:1.4rem;"></i>
+                            <div>
+                                <div style="font-weight:600;">{{ $filteredEmployee->full_name }}</div>
+                                <small class="text-muted">{{ $filteredEmployee->employee_id_number }}@if($filteredEmployee->department) - {{ $filteredEmployee->department }}@endif</small>
+                            </div>
+                        </div>
+                        <input type="hidden" name="employee_id" id="editEmployeeSelect" value="{{ $filteredEmployee->id }}">
+                        <small class="text-muted d-block mt-1">Schedule is locked to this employee and cannot be changed.</small>
                     </div>
 
                     <div class="mb-3">
@@ -282,57 +273,9 @@
 
 <script>
 const existingScheduleRules = @json($existingScheduleRules);
-const searchableOptionsCache = {};
-
-function cacheSelectOptions(selectId) {
-    const select = document.getElementById(selectId);
-    if (!select || searchableOptionsCache[selectId]) {
-        return;
-    }
-
-    searchableOptionsCache[selectId] = Array.from(select.options)
-        .filter(option => option.value !== '')
-        .map(option => ({ value: option.value, text: option.text }));
-}
-
-function rebuildSelectOptions(selectId, query) {
-    const select = document.getElementById(selectId);
-    const options = searchableOptionsCache[selectId] || [];
-    const placeholderText = 'Select Employee / Faculty';
-    const currentValue = select.value;
-    const normalizedQuery = (query || '').trim().toLowerCase();
-
-    select.innerHTML = '';
-    select.appendChild(new Option(placeholderText, ''));
-
-    const filtered = normalizedQuery
-        ? options.filter(option => option.text.toLowerCase().includes(normalizedQuery))
-        : options;
-
-    filtered.forEach(option => {
-        select.appendChild(new Option(option.text, option.value));
-    });
-
-    if (filtered.some(option => option.value === currentValue)) {
-        select.value = currentValue;
-    } else {
-        select.value = '';
-    }
-}
-
-function setupSearchableSelect(searchInputId, selectId) {
-    cacheSelectOptions(selectId);
-
-    const searchInput = document.getElementById(searchInputId);
-    if (!searchInput) {
-        return;
-    }
-
-    searchInput.addEventListener('input', function() {
-        rebuildSelectOptions(selectId, searchInput.value);
-        refreshAddScheduleInsights();
-    });
-}
+// Strictly employee-specific: single employee context (no search/select)
+const filteredEmployeeId = "{{ $filteredEmployee->id }}";
+const filteredEmployeeDisplay = @json($filteredEmployee->full_name . ' (' . $filteredEmployee->employee_id_number . ')');
 
 function parseTimeToMinutes(timeValue) {
     if (!timeValue || !timeValue.includes(':')) {
@@ -400,7 +343,7 @@ function refreshAddScheduleInsights() {
     const startTime = document.getElementById('addStartTime').value;
     const endTime = document.getElementById('addEndTime').value;
 
-    const selectedUserName = employeeSelect.options[employeeSelect.selectedIndex]?.text || 'No employee selected';
+    const selectedUserName = filteredEmployeeDisplay || 'No employee selected';
 
     const preview = document.getElementById('schedulePreviewText');
     const startMinutes = parseTimeToMinutes(startTime);
@@ -415,7 +358,7 @@ function refreshAddScheduleInsights() {
     warning.style.display = 'none';
     warning.textContent = '';
 
-    const selectedUserId = employeeSelect.value;
+    const selectedUserId = employeeSelect ? employeeSelect.value : filteredEmployeeId;
     if (!selectedUserId || selectedDays.length === 0 || startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
         return;
     }
@@ -462,7 +405,7 @@ function refreshEditScheduleInsights() {
     const endTime = document.getElementById('editEndTime').value;
     const currentScheduleId = document.getElementById('editScheduleRecordId').value;
 
-    const selectedUserName = employeeSelect.options[employeeSelect.selectedIndex]?.text || 'No employee selected';
+    const selectedUserName = filteredEmployeeDisplay || 'No employee selected';
 
     const preview = document.getElementById('editSchedulePreviewText');
     const startMinutes = parseTimeToMinutes(startTime);
@@ -477,7 +420,7 @@ function refreshEditScheduleInsights() {
     warning.style.display = 'none';
     warning.textContent = '';
 
-    const selectedUserId = employeeSelect.value;
+    const selectedUserId = employeeSelect ? employeeSelect.value : filteredEmployeeId;
     if (!selectedUserId || selectedDays.length === 0 || startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
         return;
     }
@@ -519,7 +462,7 @@ function refreshEditScheduleInsights() {
 
 function openEditSchedule(button) {
     const id = button.dataset.id;
-    const employeeId = button.dataset.employeeId;
+    // Employee is locked to filteredEmployeeId; ignore passed employeeId mismatch
     const days = JSON.parse(button.dataset.days || '[]');
     const startTime = button.dataset.startTime;
     const endTime = button.dataset.endTime;
@@ -528,7 +471,9 @@ function openEditSchedule(button) {
     form.action = `/schedule/${id}`;
     document.getElementById('editScheduleRecordId').value = id;
 
-    document.getElementById('editEmployeeSelect').value = employeeId || '';
+    // Locked: always keep filteredEmployeeId
+    const hiddenEmp = document.getElementById('editEmployeeSelect');
+    if (hiddenEmp) hiddenEmp.value = filteredEmployeeId;
 
     document.querySelectorAll('input[name="schedule_days[]"][id^="editDay"]').forEach(checkbox => {
         checkbox.checked = days.includes(checkbox.value);
@@ -554,11 +499,7 @@ function deleteSchedule(scheduleId) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    setupSearchableSelect('employeeSearch', 'employeeSelect');
-    setupSearchableSelect('editEmployeeSearch', 'editEmployeeSelect');
-
     const addFormElements = [
-        document.getElementById('employeeSelect'),
         document.getElementById('addStartTime'),
         document.getElementById('addEndTime')
     ];
@@ -575,7 +516,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     const editFormElements = [
-        document.getElementById('editEmployeeSelect'),
         document.getElementById('editStartTime'),
         document.getElementById('editEndTime')
     ];

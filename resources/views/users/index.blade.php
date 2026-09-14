@@ -67,7 +67,7 @@
                             type="text"
                             class="form-control"
                             name="employee_search"
-                            placeholder="Name, Employee ID, Department, Email"
+                            placeholder="Name, Employee ID, Department"
                             value="{{ $employeeFilters['search'] ?? '' }}"
                         >
                     </div>
@@ -118,8 +118,6 @@
                                     <th>Name</th>
                                     <th>ID</th>
                                     <th>Department</th>
-                                    <th>Email</th>
-                                    <th>Phone</th>
                                     <th>Status</th>
                                     <th>Action</th>
                                 </tr>
@@ -130,8 +128,6 @@
                                         <td><strong>{{ $employee->full_name }}</strong></td>
                                         <td>{{ $employee->employee_id_number }}</td>
                                         <td>{{ $employee->department ?? '-' }}</td>
-                                        <td>{{ $employee->email ?? '-' }}</td>
-                                        <td>{{ $employee->phone ?? '-' }}</td>
                                         <td>
                                             @if(($employee->status ?? 'active') === 'active')
                                                 <span class="badge bg-success">Active</span>
@@ -145,7 +141,7 @@
                                                     <i class="fas fa-edit"></i>
                                                 </button>
                                                 @php $isEnrolled = ($employee->fingerprints_count ?? 0) > 0; @endphp
-                                                <a href="{{ route('scan.employee.zk9500.enroll', ['employee_id' => $employee->employee_id_number]) }}" class="action-btn" title="{{ $isEnrolled ? 'Change Fingerprint (already enrolled)' : 'Enroll Fingerprint' }}" style="background:{{ $isEnrolled ? '#ffc107;color:#111;border:1px solid #e0a800' : '#198754;color:#fff' }};display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">
+                                                <a href="{{ route('scan.employee.zk9500.enroll', ['employee_id' => $employee->employee_id_number, 'return_url' => request()->fullUrl()]) }}" class="action-btn" title="{{ $isEnrolled ? 'Change Fingerprint (already enrolled)' : 'Enroll Fingerprint' }}" style="background:{{ $isEnrolled ? '#ffc107;color:#111;border:1px solid #e0a800' : '#198754;color:#fff' }};display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">
                                                     <i class="fas fa-fingerprint"></i>
                                                 </a>
                                                 <a href="/schedule?employee_id={{ $employee->id }}" class="action-btn" title="Schedule" style="background:#198754;color:#fff;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">
@@ -164,7 +160,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" style="text-align: center; padding: 30px; color: #999;">
+                                        <td colspan="5" style="text-align: center; padding: 30px; color: #999;">
                                             <i class="fas fa-inbox"></i> No employees found
                                         </td>
                                     </tr>
@@ -329,19 +325,6 @@
                         @error('department') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
 
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Email</label>
-                            <input type="email" name="email" class="form-control @error('email') is-invalid @enderror" placeholder="e.g., employee@company.com">
-                            @error('email') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Phone</label>
-                            <input type="text" name="phone" class="form-control @error('phone') is-invalid @enderror" placeholder="e.g., +1-555-0001">
-                            @error('phone') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
-                    </div>
-
                     <div class="mb-3">
                         <label class="form-label">Status *</label>
                         <select name="status" class="form-control @error('status') is-invalid @enderror" required>
@@ -414,17 +397,6 @@
                     <div class="mb-3">
                         <label class="form-label">Department / Office</label>
                         <input type="text" name="department" id="edit_emp_department" class="form-control">
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Email</label>
-                            <input type="email" name="email" id="edit_emp_email" class="form-control">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Phone</label>
-                            <input type="text" name="phone" id="edit_emp_phone" class="form-control">
-                        </div>
                     </div>
 
                     <div class="mb-3">
@@ -632,8 +604,6 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('edit_emp_first_name').value = employee.first_name;
             document.getElementById('edit_emp_last_name').value = employee.last_name;
             document.getElementById('edit_emp_department').value = employee.department || '';
-            document.getElementById('edit_emp_email').value = employee.email || '';
-            document.getElementById('edit_emp_phone').value = employee.phone || '';
             document.getElementById('edit_emp_status').value = employee.status || 'active';
 
             const form = document.getElementById('editEmployeeForm');

@@ -15,8 +15,6 @@ class Employee extends Model
         'biometric_data',
         'photo_path',
         'department',
-        'email',
-        'phone',
         'status',
     ];
 
