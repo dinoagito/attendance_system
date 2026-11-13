@@ -2,11 +2,15 @@
 
 This document explains what the Attendance Monitoring System does, how the parts connect, and which features are actually implemented.
 
+For installation, start with [TECHNICIAN_SETUP_GUIDE.md](TECHNICIAN_SETUP_GUIDE.md). For database-version status, use [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md).
+
 ## 1. System Purpose
 
 The system records attendance for employees and faculty, manages work schedules, and records visitor entry and exit. It supports a local ZK9500 fingerprint scanner and a separate Windows Hello/WebAuthn biometric flow.
 
-The application is designed for a Windows kiosk or a small local network. It is not a payroll system and does not manage leave requests, holiday calendars, or employment contracts.
+The initial deployment target is one Windows computer running Laravel, the database, the fingerprint server, the scanner, and the kiosk browser. A small local network is a future option, not the default assumption.
+
+It is not a payroll system and does not manage leave requests, holiday calendars, or employment contracts.
 
 ## 2. Actors
 
@@ -540,7 +544,16 @@ erDiagram
 
 If the timezone is wrong, attendance can be assigned to the wrong date or time.
 
-## 15. Known Limitations
+## 15. Database and Deployment Status
+
+- MariaDB 10.4.32 is the verified development baseline, but it reached community end of life in June 2024.
+- XAMPP 8.3.36 currently lists MariaDB 10.11.16, but the actual installed version must be recorded.
+- MariaDB 11.4.13 is the current standalone 11.4 LTS candidate.
+- None of the newer candidates is production-certified until the test matrix in [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md) passes.
+- The one-computer deployment applies the same database to Laravel and the fingerprint server.
+- Visitor CSV export, full ZK9500 hardware behavior, and Windows Hello enrollment UI remain unverified or incomplete as described below.
+
+## 16. Known Limitations
 
 - There is no separation between administrator and ordinary users.
 - Public registration remains enabled.
@@ -552,14 +565,18 @@ If the timezone is wrong, attendance can be assigned to the wrong date or time.
 - There is no automatic absent-marking job at the end of the day.
 - The ZK9500 flow supports up to four time pairs per day.
 - The WebAuthn flow supports a simpler first-scan/second-scan model.
+- A complete Windows Hello enrollment screen is not exposed in the current UI, even though registration endpoints exist. Do not treat WebAuthn as a ready replacement for ZK9500 enrollment.
 - The manual attendance form does not create additional time pairs.
 - Reports are print-oriented. The visitor CSV export route exists but currently fails on datetime formatting.
 - The repository contains framework placeholder tests, not a production test suite.
 - Hardware behavior cannot be confirmed without a physical ZK9500 and working SDK installation.
 
-## 16. Related Guides
+## 17. Related Guides
 
-- Installation: [INSTALLATION.md](INSTALLATION.md)
+- One-computer setup: [TECHNICIAN_SETUP_GUIDE.md](TECHNICIAN_SETUP_GUIDE.md)
+- Quick commands: [TECHNICIAN_QUICK_REFERENCE.md](TECHNICIAN_QUICK_REFERENCE.md)
+- Database compatibility: [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md)
+- Detailed installation: [INSTALLATION.md](INSTALLATION.md)
 - ZK9500 setup: [FINGERPRINT_SETUP.md](FINGERPRINT_SETUP.md)
 - Deployment: [DEPLOYMENT.md](DEPLOYMENT.md)
 - Commands: [COMMAND_REFERENCE.md](COMMAND_REFERENCE.md)

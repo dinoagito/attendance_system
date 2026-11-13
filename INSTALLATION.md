@@ -2,9 +2,13 @@
 
 This guide installs the Laravel web application on a Windows PC using XAMPP. It covers the software-only installation. The ZK9500 scanner is configured separately in [FINGERPRINT_SETUP.md](FINGERPRINT_SETUP.md).
 
+For a beginner-friendly, one-computer walkthrough, start with [TECHNICIAN_SETUP_GUIDE.md](TECHNICIAN_SETUP_GUIDE.md). This document is the detailed reference.
+
 The commands below use PowerShell. Run them from the project root unless a step says otherwise.
 
-> Important: Stage 1 is complete when the web interface and database work. Biometric attendance is Stage 2 and requires the fingerprint server, ZKFinger SDK, and a working ZK9500 scanner.
+> Important: Stage 1 is complete for testing when the web interface and database work. It is not production-certified until the database compatibility tests pass. Biometric attendance is Stage 2 and requires the fingerprint server, ZKFinger SDK, and a working ZK9500 scanner.
+
+> Database notice: MariaDB 10.4.32 is the verified development baseline but is end-of-life. The deployment database target is not certified yet. Read [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md) and complete its test gates before storing real attendance or visitor data.
 
 ## 1. Installation Choices
 
@@ -37,6 +41,24 @@ Official download pages:
 - Laravel documentation: https://laravel.com/docs/12.x
 - ZKTeco downloads: https://www.zkteco.com/en/Downloads
 - Microsoft Visual C++ Redistributable: https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist
+
+### Database Version Gate
+
+Do not assume that a new XAMPP installer contains a particular MariaDB version. The official Apache Friends page currently lists XAMPP 8.3.36 with MariaDB 10.11.16, but that is package metadata. Record the actual installed version with:
+
+```powershell
+& "C:\xampp\mysql\bin\mysql.exe" --version
+& "C:\xampp\mysql\bin\mysqld.exe" --version
+```
+
+If present, also run `mariadbd.exe --version`. Use the measured version in the C1 candidate label.
+
+The documented candidates are:
+
+- **C1:** XAMPP 8.3.36 with its actual installed MariaDB version, expected to be 10.11.x.
+- **C2:** MariaDB 11.4.13 standalone with XAMPP used only for Apache/PHP.
+
+Neither candidate is production-ready until the full test matrix in [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md) passes. MariaDB 10.4.32 remains a development baseline only and is not recommended for a new school computer.
 
 ### Node.js Is Required in Two Different Ways
 
@@ -125,14 +147,16 @@ Open the XAMPP Control Panel and start:
 - Apache
 - MySQL
 
-Confirm PHP and Composer:
+Confirm PHP, Composer, and the database:
 
 ```powershell
 php -v
 composer --version
+& "C:\xampp\mysql\bin\mysql.exe" --version
+& "C:\xampp\mysql\bin\mysqld.exe" --version
 ```
 
-The project has been verified with PHP 8.2.12 and Composer 2.8.1.
+The repository inspection was performed on PHP 8.2.12 and Composer 2.8.1. XAMPP 8.3.36 uses PHP 8.3.36, which has not been tested with this application. Record the actual PHP and MariaDB versions before continuing.
 
 ## 6. Create the Database
 
@@ -152,6 +176,10 @@ XAMPP's MySQL executable is normally at `C:\xampp\mysql\bin\mysql.exe`.
 ```
 
 If your local root account has a password, add `-p` and enter it when prompted.
+
+Depending on the installed MariaDB version, the client may also be available as `C:\xampp\mysql\bin\mariadb.exe`. Verify which client exists before relying on a command name.
+
+For a real school deployment, use a dedicated database account with access only to `attendance_app` instead of the XAMPP `root` account. The initial local test can use root, but change it before entering real data. See the security checklist in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ### Check the InnoDB Row Format
 
@@ -252,6 +280,8 @@ php artisan migrate:status
 If the command asks whether to create the database, confirm that `DB_DATABASE=attendance_app` is correct before answering.
 
 Do not use `php artisan migrate:fresh` on a database that already contains employees, attendance, visitors, or fingerprints. It deletes all tables and data.
+
+The migration commands are documented from the existing project. They have not been verified against XAMPP 8.3.36's installed MariaDB version or MariaDB 11.4. Record the result in [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md) before using the database for real records.
 
 ## 10. Create the Public Storage Link
 
@@ -391,7 +421,7 @@ notepad .env
 npm install
 ```
 
-At minimum, confirm the database settings in `fingerprint-server\.env` point to the same database as Laravel. Do not start the server with a real scanner yet unless the SDK is installed; otherwise it starts in simulation mode.
+At minimum, confirm the database settings in `fingerprint-server\.env` point to the same database as Laravel. The database version must be the tested target from [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md). If you are testing MariaDB 11.4 on port `3307`, update both `.env` files. Do not start the server with a real scanner yet unless the SDK is installed; otherwise it starts in simulation mode.
 
 Full configuration and hardware steps are in [FINGERPRINT_SETUP.md](FINGERPRINT_SETUP.md).
 
@@ -407,6 +437,8 @@ npm start
 
 Complete these checks before configuring hardware:
 
+- [ ] The actual PHP and MariaDB versions are recorded in [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md).
+- [ ] The database version is either a tested candidate or is explicitly marked as unverified for software-only testing.
 - [ ] `php artisan about` runs without errors.
 - [ ] `php artisan migrate:status` shows all migrations as applied.
 - [ ] `http://localhost:8000/up` returns a successful response.
@@ -424,7 +456,7 @@ Complete these checks before configuring hardware:
 
 The visitor CSV export route exists, but the current source passes a datetime-cast value to a time-only Carbon format and raises `InvalidFormatException`. Do not count CSV export as verified until that source defect is fixed.
 
-At this point, software installation is complete. Do not treat simulation-mode fingerprint captures as attendance records.
+At this point, the software-only installation is complete for testing. This does not certify the database for production. Do not enter real data until the test gates in [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md) pass, and do not treat simulation-mode fingerprint captures as attendance records.
 
 ## 17. Troubleshooting
 
@@ -556,7 +588,8 @@ The root `package.json` uses Vite 7.3.2. Install Node 22.12 or newer, or Node 20
 
 ## 18. Next Steps
 
-1. Read [FINGERPRINT_SETUP.md](FINGERPRINT_SETUP.md) if biometric attendance is required.
-2. Read [PROJECT_WORKFLOW.md](PROJECT_WORKFLOW.md) to understand attendance and visitor behavior.
-3. Read [DEPLOYMENT.md](DEPLOYMENT.md) before moving the system to a permanent kiosk or server.
-4. Keep [COMMAND_REFERENCE.md](COMMAND_REFERENCE.md) available for daily operations.
+1. Read [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md) before selecting or changing the database.
+2. Read [FINGERPRINT_SETUP.md](FINGERPRINT_SETUP.md) if biometric attendance is required.
+3. Read [PROJECT_WORKFLOW.md](PROJECT_WORKFLOW.md) to understand attendance and visitor behavior.
+4. Read [DEPLOYMENT.md](DEPLOYMENT.md) before moving the system to a permanent kiosk or server.
+5. Keep [TECHNICIAN_QUICK_REFERENCE.md](TECHNICIAN_QUICK_REFERENCE.md) and [COMMAND_REFERENCE.md](COMMAND_REFERENCE.md) available for daily operations.

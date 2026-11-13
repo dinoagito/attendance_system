@@ -2,9 +2,19 @@
 
 A Windows-based attendance and visitor monitoring system for employees and faculty. It combines a Laravel web application, a MySQL or MariaDB database, and a separate local Node.js service that communicates with a ZKTeco ZK9500 fingerprint scanner.
 
-The repository is verified against commit `27260c1`. The setup and deployment instructions in this documentation set are written for Windows and PowerShell.
+This documentation set was refreshed from repository commit `917b7ae`. The documentation files may contain uncommitted changes; check `git log -1` before treating a commit hash as final. The instructions are written for Windows and PowerShell.
 
 > Hardware notice: the ZK9500 scanner and its SDK were not available in the environment used to prepare these documents. Scanner detection, enrollment, matching, and attendance recording through the physical device remain hardware-dependent and must be verified on the target kiosk PC.
+
+## Start Here
+
+For a beginner-friendly, sequential installation on one Windows computer, start with:
+
+1. [TECHNICIAN_SETUP_GUIDE.md](TECHNICIAN_SETUP_GUIDE.md)
+2. [TECHNICIAN_QUICK_REFERENCE.md](TECHNICIAN_QUICK_REFERENCE.md)
+3. [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md)
+
+The database recommendation is not final. MariaDB 10.4.32 is the known development baseline and is end-of-life. Test a newer candidate before storing real school data.
 
 ## Implemented Features
 
@@ -44,10 +54,10 @@ The following are not implemented as modules in this repository:
 
 | Component | Version or Requirement |
 | --- | --- |
-| PHP | 8.2 or newer |
+| PHP | 8.2 or newer; the project was inspected on PHP 8.2.12. Newer PHP versions require testing. |
 | Laravel | 12.x |
 | Composer | 2.x |
-| Database | MySQL 8.x or MariaDB 10.4+ |
+| Database | MySQL or MariaDB. MariaDB 10.4.32 is the verified development baseline but is EOL. The deployment target is still being tested; see [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md). |
 | Web server | Apache from XAMPP, or `php artisan serve` for local testing |
 | Node.js | Required for the fingerprint server; Node 22.12+ or 20.19+ is recommended for compatibility with the root Vite toolchain |
 | Fingerprint server | Express, `mysql2`, `ws`, and `koffi` |
@@ -81,6 +91,8 @@ flowchart LR
 
 ## Quick Start
 
+For the one-computer technician path, use [TECHNICIAN_SETUP_GUIDE.md](TECHNICIAN_SETUP_GUIDE.md). The summary below is only an overview.
+
 ### Stage 1: Software Only
 
 1. Install PHP, Composer, MySQL/MariaDB, and a web server.
@@ -113,13 +125,16 @@ Follow [FINGERPRINT_SETUP.md](FINGERPRINT_SETUP.md).
 
 | Document | Purpose |
 | --- | --- |
-| [INSTALLATION.md](INSTALLATION.md) | Windows installation from a fresh clone |
+| [TECHNICIAN_SETUP_GUIDE.md](TECHNICIAN_SETUP_GUIDE.md) | Beginner-friendly, sequential setup for one Windows computer |
+| [TECHNICIAN_QUICK_REFERENCE.md](TECHNICIAN_QUICK_REFERENCE.md) | Daily commands, startup order, health checks, backup, and common fixes |
+| [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md) | Verified database facts, candidates, test gates, and migration risks |
+| [INSTALLATION.md](INSTALLATION.md) | Detailed Windows installation reference |
 | [FINGERPRINT_SETUP.md](FINGERPRINT_SETUP.md) | ZK9500 SDK, DLL, fingerprint server, enrollment, and scanning |
 | [PROJECT_WORKFLOW.md](PROJECT_WORKFLOW.md) | Features, routes, data model, attendance rules, and workflows |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Production deployment, startup, backup, upgrade, and security |
 | [COMMAND_REFERENCE.md](COMMAND_REFERENCE.md) | PowerShell commands, health checks, PM2 options, and troubleshooting |
 
-The older `setup.md` file is a combined setup guide from an earlier revision. Use the six documents above as the current reference.
+The older `setup.md` file is a combined setup guide from an earlier revision. Use the guides above as the current reference.
 
 ## Main Routes
 
@@ -182,11 +197,15 @@ Because `/register` is public, anyone who can reach the application can create a
 - The visitor CSV export currently throws `Carbon\Exceptions\InvalidFormatException` because it parses a datetime-cast value with a time-only format. The route exists, but do not rely on CSV export until the source is corrected.
 - Avoid `php artisan migrate:fresh` on any database that contains real attendance or visitor records.
 - A known MySQL/MariaDB key-length issue can occur during migration on older configurations. See [INSTALLATION.md](INSTALLATION.md#troubleshooting-the-1071-key-length-error).
+- MariaDB 10.4.32 is end-of-life and is not the recommended database for a new school computer. Read [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md) before selecting or upgrading the database.
 
 ## Verification Scope
 
 The repository inspection verified the routes, migrations, models, controllers, fingerprint server structure, environment keys, and bundled DLL. The following were not verified:
 
+- A fresh installation of the newer database candidates.
+- Migrations, application workflows, or the fingerprint server against XAMPP 8.3.36's installed MariaDB version.
+- Migrations or data import against MariaDB 11.4.
 - Physical ZK9500 detection.
 - Fingerprint capture quality.
 - Fingerprint enrollment on a real device.
@@ -194,4 +213,4 @@ The repository inspection verified the routes, migrations, models, controllers, 
 - Physical scanner attendance recording.
 - PM2 startup on Windows, because PM2 is not configured in this repository.
 
-Use [FINGERPRINT_SETUP.md](FINGERPRINT_SETUP.md) and the post-deployment checklist in [DEPLOYMENT.md](DEPLOYMENT.md) to complete hardware verification on the target machine.
+Use [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md) for the database test gates, [FINGERPRINT_SETUP.md](FINGERPRINT_SETUP.md) for hardware setup, and the post-deployment checklist in [DEPLOYMENT.md](DEPLOYMENT.md) to complete verification on the target machine.

@@ -2,6 +2,8 @@
 
 This guide configures the separate Node.js fingerprint service and the ZKTeco ZK9500 scanner.
 
+For the one-computer installation order, start with [TECHNICIAN_SETUP_GUIDE.md](TECHNICIAN_SETUP_GUIDE.md). Before using this guide, confirm that the database target is accepted in [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md).
+
 > Hardware verification status: no physical ZK9500 scanner or working SDK environment was available while these documents were prepared. Installation, DLL loading, detection, enrollment, matching, and attendance recording through the scanner must be verified on the target Windows PC.
 
 ## 1. How the Fingerprint Flow Works
@@ -27,7 +29,7 @@ flowchart TD
 - The browser calls the fingerprint server at `http://127.0.0.1:3001`.
 - The fingerprint server uses `koffi` to load the ZKTeco `libzkfp.dll`.
 - Fingerprint templates and attendance records are written directly to the shared MySQL/MariaDB database.
-- Laravel and the fingerprint server must use the same database.
+- Laravel and the fingerprint server must use the same database, port, and database version.
 
 The browser code tries these addresses in order:
 
@@ -50,7 +52,7 @@ The fingerprint server must therefore run on the same PC as the browser and scan
 - Node.js. Node 22.12+ or Node 20.19+ is recommended.
 - The ZKFinger SDK for the ZK9500.
 - The Microsoft Visual C++ Redistributable required by the SDK and DLL.
-- A working Laravel installation and database.
+- A working Laravel installation and database using the tested target from [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md).
 - At least one employee with a schedule.
 
 Use the same architecture for Node.js and the DLL. A 64-bit Node.js process normally requires a 64-bit DLL. A 32-bit DLL requires a 32-bit Node.js process.
@@ -181,11 +183,13 @@ OVERTIME_MINUTES=60
 UNDERTIME_MINUTES=60
 ```
 
+If you are testing the standalone MariaDB 11.4 candidate on port `3307`, set `DB_PORT=3307` here and in Laravel's `.env`. Use `3306` for the normal XAMPP database unless you have deliberately configured another port.
+
 ### Configuration Notes
 
 | Setting | Meaning |
 | --- | --- |
-| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Must match the Laravel database |
+| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Must match the Laravel database and tested database version |
 | `DB_SSL` | Keep `false` for local MySQL/MariaDB unless your database requires TLS |
 | `PORT` | REST and WebSocket server port; default `3001` |
 | `FINGERPRINT_SSL` | Keep `false` for local HTTP; see the TLS note below |
@@ -587,6 +591,7 @@ Set Windows and MySQL/MariaDB to the correct timezone. The Node process computes
 
 Complete these checks on the target kiosk:
 
+- [ ] The actual database version is recorded in [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md) and its test gates have passed.
 - [ ] Official ZKTeco SDK and required runtime are installed.
 - [ ] The DLL path is correct or the bundled DLL loads successfully.
 - [ ] Device Manager detects the ZK9500.
@@ -605,3 +610,10 @@ Complete these checks on the target kiosk:
 - [ ] Restarting Windows and following the chosen startup method works.
 
 Do not mark biometric acceptance complete until these checks pass on real hardware.
+
+## 16. Related Guides
+
+- One-computer setup: [TECHNICIAN_SETUP_GUIDE.md](TECHNICIAN_SETUP_GUIDE.md)
+- Quick commands: [TECHNICIAN_QUICK_REFERENCE.md](TECHNICIAN_QUICK_REFERENCE.md)
+- Database compatibility: [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md)
+- Deployment and security: [DEPLOYMENT.md](DEPLOYMENT.md)

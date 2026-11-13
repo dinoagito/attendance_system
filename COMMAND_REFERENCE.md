@@ -2,7 +2,9 @@
 
 This reference lists the commands used to install, run, verify, back up, and troubleshoot the Attendance Monitoring System on Windows PowerShell.
 
-Run commands from the locations shown. Do not paste real passwords into shared documentation.
+For the sequential one-computer procedure, use [TECHNICIAN_SETUP_GUIDE.md](TECHNICIAN_SETUP_GUIDE.md). For database version status and test gates, use [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md).
+
+Run commands from the locations shown. Do not paste real passwords into shared documentation. Do not assume that `mysql.exe` or `mysqldump.exe` is the correct client for every MariaDB version; verify which executables are present.
 
 ## 1. Path Variables
 
@@ -35,6 +37,31 @@ npm -v
 git --version
 ```
 
+Check PHP and database versions:
+
+```powershell
+& "C:\xampp\php\php.exe" -v
+& "C:\xampp\mysql\bin\mysql.exe" --version
+& "C:\xampp\mysql\bin\mysqld.exe" --version
+```
+
+If present:
+
+```powershell
+& "C:\xampp\mysql\bin\mariadbd.exe" --version
+```
+
+Record the exact database version in [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md). Do not infer the installed version from the XAMPP installer page.
+
+If the database service is already running, check the server version and row format:
+
+```powershell
+& "C:\xampp\mysql\bin\mysql.exe" -u root -e "SELECT VERSION(), @@version_comment;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root -e "SHOW VARIABLES LIKE 'innodb_default_row_format';"
+```
+
+Do not start the database service only to run these checks on an existing environment that must remain untouched.
+
 Check PHP extensions:
 
 ```powershell
@@ -55,6 +82,14 @@ Get-Command composer
 Get-Command node
 Get-Command npm
 ```
+
+### Verify an Installer Checksum
+
+```powershell
+Get-FileHash -LiteralPath "C:\path\to\installer.exe" -Algorithm SHA256
+```
+
+Compare the result with the checksum published on the official vendor page. Do not use a checksum copied from an unofficial download site.
 
 ## 3. First-Time Setup Commands
 
@@ -103,6 +138,8 @@ php artisan about
 ```powershell
 & "C:\xampp\mysql\bin\mysql.exe" -u root -e "CREATE DATABASE IF NOT EXISTS attendance_app CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 ```
+
+Depending on the installed MariaDB version, the client may be `mariadb.exe`. Verify which client exists before relying on a command name. For real data, use a dedicated database account rather than root.
 
 Check the InnoDB row format:
 
@@ -481,6 +518,14 @@ The repository currently contains framework example tests. Do not assume they re
 
 If the local root account has no password, omit `-p`.
 
+Check for the MariaDB client alternative:
+
+```powershell
+Get-ChildItem "C:\xampp\mysql\bin\mariadb*.exe"
+```
+
+Use `mariadb.exe`, `mariadb-dump.exe`, and the other `mariadb-*` tools when they are the clients installed by the selected MariaDB version. Do not assume that `mysql.exe` and `mysqldump.exe` are always present.
+
 ### Show Databases
 
 ```powershell
@@ -544,6 +589,12 @@ Use `--result-file` rather than PowerShell `>` redirection:
 
 If the account has a password, add `-p` and enter it when prompted. Do not place the password on the command line.
 
+If `mysqldump.exe` is not present, use the MariaDB client equivalent after verifying its name:
+
+```powershell
+& "C:\xampp\mysql\bin\mariadb-dump.exe" -u root --single-transaction --routines --triggers attendance_app --result-file="$AppRoot\storage\backups\attendance_app_2026-11-12.sql"
+```
+
 ### Verify the Backup File
 
 ```powershell
@@ -560,6 +611,8 @@ cmd /c "C:\xampp\mysql\bin\mysql.exe -u root -p attendance_app < C:\xampp\htdocs
 ```
 
 Back up the current database before restoring.
+
+If the installed client is `mariadb.exe`, use it for the restore after verifying the executable exists.
 
 ### Back Up Visitor Photos
 
@@ -835,6 +888,9 @@ Avoid these on a live system unless you have a verified backup and a clear recov
 - `Remove-Item` against `storage`, uploaded visitor photos, or backups
 - `pm2 delete` when you still need the process configuration
 - Any command containing a real password in shell history
+- Installing an end-of-life database as the new school deployment without a documented risk decision
+- Changing the database version or port without updating both Laravel and fingerprint-server `.env` files
+- Running the fingerprint server against an untested or different database
 
 ## 17. Quick Command Summary
 
@@ -871,3 +927,12 @@ Get-Content -LiteralPath "storage\logs\laravel.log" -Tail 100
 Get-NetTCPConnection -LocalPort 3001 -State Listen
 Get-NetTCPConnection -LocalPort 8000 -State Listen
 ```
+
+## 18. Related Guides
+
+- One-computer setup: [TECHNICIAN_SETUP_GUIDE.md](TECHNICIAN_SETUP_GUIDE.md)
+- Quick reference: [TECHNICIAN_QUICK_REFERENCE.md](TECHNICIAN_QUICK_REFERENCE.md)
+- Database compatibility: [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md)
+- Detailed installation: [INSTALLATION.md](INSTALLATION.md)
+- ZK9500 setup: [FINGERPRINT_SETUP.md](FINGERPRINT_SETUP.md)
+- Deployment: [DEPLOYMENT.md](DEPLOYMENT.md)

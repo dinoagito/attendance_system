@@ -2,7 +2,9 @@
 
 This guide covers the permanent deployment of the Attendance Monitoring System on Windows. It assumes the software installation and database migrations are already complete.
 
-For first-time setup, see [INSTALLATION.md](INSTALLATION.md). For the scanner, see [FINGERPRINT_SETUP.md](FINGERPRINT_SETUP.md).
+For a beginner-friendly, one-computer setup, start with [TECHNICIAN_SETUP_GUIDE.md](TECHNICIAN_SETUP_GUIDE.md). For first-time software installation, see [INSTALLATION.md](INSTALLATION.md). For the scanner, see [FINGERPRINT_SETUP.md](FINGERPRINT_SETUP.md).
+
+> Database notice: no newer database candidate is certified yet. MariaDB 10.4.32 is an end-of-life development baseline. Complete the test gates in [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md) before treating this deployment as production-ready.
 
 > Hardware notice: the ZK9500 scanner, SDK, and fingerprint matching were not verified in the environment used to prepare this document. Complete the hardware checklist on the target kiosk.
 
@@ -62,11 +64,13 @@ Important rules for this layout:
 ## 2. Pre-Deployment Checklist
 
 - [ ] A tested database backup exists.
+- [ ] The actual PHP and database versions are recorded.
+- [ ] The database candidate has passed the tests in [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md).
 - [ ] The software-only installation works.
 - [ ] Employees and schedules are configured.
 - [ ] Visitor photo storage works.
 - [ ] A plan exists for the scanner hardware and SDK.
-- [ ] The target deployment topology is selected.
+- [ ] The target deployment topology is selected; the default is one computer.
 - [ ] The PC has a stable timezone and time source.
 - [ ] The Windows account that runs services has access to the project directory and scanner.
 - [ ] You know how the fingerprint server will start after reboot.
@@ -106,6 +110,8 @@ LOG_LEVEL=warning
 ```
 
 Do not use the example password. Do not commit the real `.env`.
+
+The database settings must point to the database version that passed [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md). Do not assume that an existing or newly installed XAMPP database is supported. Record the actual server version and keep the test evidence with the deployment record.
 
 ### HTTPS Requirement in Production
 
@@ -340,6 +346,8 @@ Use `mysqldump` with `--result-file` instead of PowerShell redirection:
 
 If your account has a password, add `-p` and enter it when prompted. Do not put the password directly in the command or in documentation.
 
+Do not assume the executable name. XAMPP 10.11/11.4 installations may provide `mariadb-dump.exe` as well as, or instead of, `mysqldump.exe`. Verify the file in `C:\xampp\mysql\bin` and record which client was used. The restore client must also match the installed database version.
+
 ### Photo Backup
 
 ```powershell
@@ -356,7 +364,7 @@ For a controlled restore, stop writes to the application, back up the current da
 cmd /c "C:\xampp\mysql\bin\mysql.exe -u root -p attendance_app < C:\xampp\htdocs\attendance_app\storage\backups\attendance_app_2026-11-12.sql"
 ```
 
-You can also import the SQL file through phpMyAdmin. Test the restore on a non-production copy first.
+You can also import the SQL file through phpMyAdmin. Test the restore on a non-production copy first. If the installed client is `mariadb.exe`, use that instead of `mysql.exe`.
 
 ## 11. Upgrade Procedure
 
@@ -376,7 +384,7 @@ php artisan down
 composer install --no-dev --optimize-autoloader
 ```
 
-6. Run migrations:
+6. Do not change the database version as part of an application upgrade unless the new version has passed the compatibility tests and a backup/restore test. Run migrations:
 
 ```powershell
 php artisan migrate --force
@@ -486,6 +494,7 @@ Invoke-WebRequest -Uri "https://attendance.example.local/up" -UseBasicParsing
 
 ## 15. Known Deployment Constraints
 
+- The production database version is not certified yet. MariaDB 10.4.32 is end-of-life and is a development baseline only. See [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md).
 - PM2 is not configured by the project. Use `npm start` and the built-in watchdog, or add PM2 as a separate operational choice.
 - The browser calls `127.0.0.1:3001`, so the fingerprint server must run on the kiosk PC.
 - `WS_PORT=3002` in the example environment is unused; WebSocket traffic uses the main server port at `/ws`.
@@ -494,3 +503,12 @@ Invoke-WebRequest -Uri "https://attendance.example.local/up" -UseBasicParsing
 - The visitor CSV export route currently raises `InvalidFormatException` because of datetime formatting. It requires a source correction before the export can be used reliably.
 - There is no automated high-availability, queue-based failover, or central device-management system.
 - The repository has no container, systemd, or CI/CD deployment configuration.
+
+## 16. Related Guides
+
+- One-computer setup: [TECHNICIAN_SETUP_GUIDE.md](TECHNICIAN_SETUP_GUIDE.md)
+- Quick commands: [TECHNICIAN_QUICK_REFERENCE.md](TECHNICIAN_QUICK_REFERENCE.md)
+- Database compatibility: [DATABASE_COMPATIBILITY.md](DATABASE_COMPATIBILITY.md)
+- Detailed installation: [INSTALLATION.md](INSTALLATION.md)
+- ZK9500 setup: [FINGERPRINT_SETUP.md](FINGERPRINT_SETUP.md)
+- Full command list: [COMMAND_REFERENCE.md](COMMAND_REFERENCE.md)
